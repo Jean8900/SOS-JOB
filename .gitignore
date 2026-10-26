@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+output/CV/tex/*
+output/CV/pdf/*
+output/LM/*
+!output/CV/tex/.gitkeep
+!output/CV/pdf/.gitkeep
+!output/LM/.gitkeep
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.synctex.gz

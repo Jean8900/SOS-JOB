@@ -1,0 +1,39 @@
+# Critères de matching pour MVP1. Filtre STRICT : une offre doit satisfaire
+# tous les critères non vides pour apparaître dans le tableau.
+# Laisse une liste vide ([]) ou une valeur null pour ne pas filtrer dessus.
+
+# Villes/régions acceptées (comparé à offices[].city / state, insensible à la casse)
+locations:
+  - Paris
+  - Lyon
+  - Remote
+
+# "full" | "partial" | "no" | null (null = peu importe)
+remote: null
+
+# Valeurs WTJ possibles : full_time, apprenticeship, internship, part_time, vie, temporary
+contract_types:
+  - full_time
+
+# Mots-clés métier (cherchés dans profession.category_name / sub_category_name / titre du poste)
+professions:
+  - Data Scientist
+  - AI Engineer
+  - Machine Learning
+  - Data Engineer
+
+# Mots-clés stack technique (cherchés dans la description complète de l'offre)
+stack:
+  - Python
+  - LLM
+  - PyTorch
+
+# Mots-clés séniorité (cherchés dans le titre + la description). Vide = peu importe.
+seniority: []
+
+# Texte additionnel injecté dans la recherche élargie Algolia (relevance full-text),
+# en plus de "professions" + "stack". Laisse vide si tu ne veux rien ajouter.
+search_query_extra: ""
+
+# Nombre maximum d'offres affichées dans le tableau
+max_results: 100

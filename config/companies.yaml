@@ -1,0 +1,8 @@
+# Entreprises suivies en priorité (slug WTJ, visible dans l'URL /companies-v1/<slug>/jobs)
+# alten-1 retiré le 2026-10-26 : scraping en échec (cf. debug minimaliste dans scraper.py)
+companies:
+  - illuin-tech
+  - deloitte
+  - capgemini
+
+language: fr  # langue de l'URL WTJ utilisée (fr ou en)

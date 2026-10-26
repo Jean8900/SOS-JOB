@@ -1,0 +1,133 @@
+
+\documentclass[10pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1.2cm]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage[explicit]{titlesec}
+\usepackage{xcolor}
+\usepackage{fontawesome5}
+\usepackage{lmodern}
+
+% --- COLOR DEFINITIONS ---
+\definecolor{primary}{RGB}{30, 50, 90}      % Navy Blue accent
+\definecolor{textdark}{RGB}{40, 40, 40}    % Dark Charcoal for text
+\definecolor{subtle}{RGB}{100, 100, 100}  % Grey for muted text
+
+% --- SETUP & STYLING ---
+\pagestyle{empty}
+\color{textdark}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    urlcolor=primary
+}
+
+% Custom section formatting
+\titleformat{\section}
+  {\color{primary}\large\bfseries}
+  {}{0em}
+  {\MakeUppercase{#1}}
+  [\color{primary}\titlerule]
+
+\titlespacing*{\section}{0pt}{8pt}{4pt}
+
+% Custom list parameters
+\setlist[itemize]{leftmargin=*, parsep=0pt, itemsep=2pt, topsep=1pt}
+
+% --- DOCUMENT BEGIN ---
+\begin{document}
+
+% --- HEADER ---
+\begin{center}
+    {\Huge \bfseries \color{primary} Jean MARTINI}\\[4pt]
+    {\large \bfseries AI Engineer -- Centrale Lyon Graduate}\\[6pt]
+    \small
+    Paris \quad$\cdot$\quad 
+    +33 7 52 02 31 20 \quad$\cdot$\quad 
+    \href{mailto:jean.martini8900@gmail.com}{jean.martini8900@gmail.com} \quad$\cdot$\quad 
+    Driver's License\\[2pt]
+    \href{https://linkedin.com/in/jean-martini-64a017228/}{\faLinkedin\ LinkedIn} \quad$\cdot$\quad 
+    \href{https://github.com/Jean8900}{\faGithub\ GitHub}
+\end{center}
+
+% --- PROFILE ---
+\section{Profile}
+Centrale Lyon graduate (2025), specialized in predictive modeling, computer vision, and Large Language Models (LLMs). Active AI hackathon competitor (€1,750 won). Currently Data Scientist / AI Engineer at Illuin Technology.\\[3pt]
+\textbf{Tech Stack:} Python, PyTorch, scikit-learn, XGBoost, OpenCV, Flask, Docker, SQL, Plotly, Git, Mistral API\\
+\textbf{Languages:} French (Native) \quad$\cdot$\quad English (C1) \quad$\cdot$\quad Spanish (B1) \quad$\cdot$\quad Japanese (A2)
+
+% --- WORK EXPERIENCE ---
+\section{Professional Experience}
+
+\textbf{Illuin Technology} \hfill Paris, France\\
+\textit{AI Engineer} \hfill \small April 2026 -- Present
+\begin{itemize}
+    \item Developed and enhanced conversational agents using ILLUIN Dialogue for Orange's mobile plan acquisition and account management journeys.
+    \item Designed 5 specialized agents leveraging prompt engineering, tool calling, RAG, automated testing, and conversation flow optimization.
+    \item Worked within a 20-person Illuin team in close collaboration with Orange teams to ensure high reliability in agent responses and actions.
+\end{itemize}
+
+\textbf{IFP Energies Nouvelles} \hfill Lyon, France\\
+\textit{Data Scientist Intern} \hfill \small April 2025 -- September 2025
+\begin{itemize}
+    \item Industrial tire classification via spectral scanning for recycling: handled NIR scan technology, experimental protocol, data acquisition, and ML pipeline design (PLS-DA + SVM).
+    \item Implemented Successive Projections Algorithm (SPA) for feature selection: reduced acquisition time by 10x while maintaining 100\% accuracy.
+    \item Poster presented at the National Chemometrics Congress (GFC-NCA 2026, February 2026).
+\end{itemize}
+
+\textbf{Société du Canal de Provence} \hfill Aix-en-Provence, France\\
+\textit{Climate Data Analyst Intern / Contractor} \hfill \small September 2023 -- March 2024
+\begin{itemize}
+    \item Developed climate analysis pipelines: integrated global hydro-climatic datasets (WorldClim, DRIAS, Explore2) and 2050 climate change projections (SSP/RCP scenarios).
+    \item Conducted international predictive studies on groundwater table dynamics in Madagascar, drought risks in Panama, and hydroelectricity in Bosnia (projected -20\% capacity by 2050). Collaborated with Ernst \& Young. Internship extended by 3 months.
+\end{itemize}
+
+% --- EDUCATION ---
+\section{Education}
+
+\textbf{Centrale Lyon} \hfill September 2021 -- September 2025\\
+\textit{Master's Degree in General Engineering} \hfill Lyon, France\\[2pt]
+\textbf{Keio University} \hfill April 2023 -- August 2023\\
+\textit{Academic Exchange in Artificial Intelligence} -- Data Science specialization \hfill Tokyo, Japan\\
+\small Academic exchange focused on AI and Computer Vision courses.
+
+\vspace{2pt}
+\noindent\textbf{Certifications:} Dataiku Core Designer (2025) \quad$\cdot$\quad Stanford Deep Learning (Andrew Ng) \quad$\cdot$\quad Inria Machine Learning with scikit-learn
+
+% --- HACKATHONS & COMPETITIONS ---
+\section{Hackathons \& Competitions}
+
+\textbf{GE Healthcare - Mistral AI - Hackathon AI for Health} \hfill \textbf{3\textsuperscript{rd} / 22 teams (€1,750 prize)}
+\begin{itemize}
+    \item CV 3D CT scan segmentation: automated extraction of the slice showing the maximum tumor diameter (2,000 views).
+    \item Lung-RADS / RECIST classification and automated report generation via Mistral AI, validated by a radiologist.
+    \item Reduced analysis time by 10x (20 min $\rightarrow$ 2 min, ref. IGAS) at a cost of €0.01/report on real data.
+\end{itemize}
+
+\textbf{CSIRO Image2biomass} (\$75k prize pool) \hfill \textbf{Top 10\%}
+\begin{itemize}
+    \item Computer vision competition predicting agricultural biomass from field images.
+    \item Combined Vision Transformer (DINOv2) + MLP to achieve $R^2 = 0.70$.
+\end{itemize}
+
+% --- VOLUNTEERING & LEADERSHIP ---
+\section{Community Engagement \& Leadership}
+
+\textbf{Adopt AI Forum} \hfill November 2025\\
+\textit{Global Forum on AI Adoption across industries (600 CEOs, keynote by the French President)}
+\begin{itemize}
+    \item Private Spaces Manager: coordinated logistics and served as primary interface for corporate partners (BNP Paribas, Nvidia, Meta, Servier).
+\end{itemize}
+
+\textbf{Solidari'terre} \hfill 2022 -- 2023\\
+\textit{Project Manager -- Night Outreach (Centrale Lyon's humanitarian organization, 17 members)}
+\begin{itemize}
+    \item Coordinated 5 volunteers per session, managed inventory and logistics for 30 weekly meal distributions.
+\end{itemize}
+
+\end{document}
+
