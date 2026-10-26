@@ -125,9 +125,9 @@ def _algolia_search(config: dict, query: str = "", filters: str = "", hits_per_p
     return hits
 
 
-def fetch_job_hits(config: dict) -> list[dict]:
+def fetch_job_hits(config: dict, max_pages: int = 3) -> list[dict]:
     """Toutes les offres d'une entreprise (page jobs de l'entreprise)."""
-    hits = _algolia_search(config, filters=_build_algolia_filters(config["filters"]))
+    hits = _algolia_search(config, filters=_build_algolia_filters(config["filters"]), max_pages=max_pages)
     default_job = config.get("default_job") or {}
     if default_job.get("slug"):
         hits.append(default_job)
@@ -184,7 +184,7 @@ def company_url(slug: str, language: str = "fr") -> str:
     return f"https://www.welcometothejungle.com/{language}/companies-v1/{slug}/jobs"
 
 
-def collect_followed_companies(slugs: list[str], language: str = "fr") -> tuple[list[dict], list[dict]]:
+def collect_followed_companies(slugs: list[str], language: str = "fr", max_pages: int = 3) -> tuple[list[dict], list[dict]]:
     """Scrape la liste d'entreprises suivies.
 
     Debug minimaliste : une entreprise qui échoue n'interrompt pas les autres ;
@@ -197,7 +197,7 @@ def collect_followed_companies(slugs: list[str], language: str = "fr") -> tuple[
         url = company_url(slug, language)
         try:
             config = get_company_jobs_config(url)
-            hits = fetch_job_hits(config)
+            hits = fetch_job_hits(config, max_pages=max_pages)
         except (ScraperError, requests.RequestException, ValueError, KeyError) as exc:
             errors.append({"company": slug, "error": str(exc)})
             print(f"[scraper] {slug}: ECHEC -- {exc}")

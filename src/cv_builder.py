@@ -14,6 +14,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from . import config
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TEX = REPO_ROOT / "input" / "CV_originel.tex"
 OUTPUT_TEX_DIR = REPO_ROOT / "output" / "CV" / "tex"
@@ -56,21 +58,29 @@ def _job_role_label(job: dict) -> str:
 
 
 def render_header(reference_text: str, objective: str, location: str) -> str:
+    anchors = config.load_cv_template()
+    subtitle_anchor = anchors["subtitle_anchor"]
+    location_anchor = anchors["location_anchor"]
+
     header_start = reference_text.index("% --- HEADER ---")
     header_end = reference_text.index(r"\end{center}", header_start)
     header_block = reference_text[header_start:header_end]
 
-    if "AI Engineer -- Centrale Lyon Graduate" not in header_block:
-        raise ValueError("Ancre du header introuvable (sous-titre) -- input/CV_originel.tex a changé, adapte cv_builder.py.")
-    if "Paris \\quad$\\cdot$\\quad" not in header_block:
-        raise ValueError("Ancre du header introuvable (localisation) -- input/CV_originel.tex a changé, adapte cv_builder.py.")
+    if subtitle_anchor not in header_block:
+        raise ValueError(
+            f"Ancre du header introuvable (subtitle_anchor=\"{subtitle_anchor}\") -- "
+            "input/CV_originel.tex a changé, mets à jour input/cv_template.yaml."
+        )
+    if location_anchor not in header_block:
+        raise ValueError(
+            f"Ancre du header introuvable (location_anchor=\"{location_anchor}\") -- "
+            "input/CV_originel.tex a changé, mets à jour input/cv_template.yaml."
+        )
 
     new_header_block = header_block.replace(
-        "AI Engineer -- Centrale Lyon Graduate",
-        f"{escape_latex(objective)}", 1,
+        subtitle_anchor, escape_latex(objective), 1,
     ).replace(
-        "Paris \\quad$\\cdot$\\quad",
-        f"{escape_latex(location)} \\quad$\\cdot$\\quad", 1,
+        location_anchor, f"{escape_latex(location)} \\quad$\\cdot$\\quad", 1,
     )
     return reference_text[:header_start] + new_header_block + reference_text[header_end:]
 

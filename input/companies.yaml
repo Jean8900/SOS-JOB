@@ -6,3 +6,8 @@ companies:
   - capgemini
 
 language: fr  # langue de l'URL WTJ utilisée (fr ou en)
+
+# Entreprise utilisée comme "ancre" technique pour interroger l'index de recherche
+# global WTJ (recherche élargie + liste des entreprises par métier). N'importe
+# quelle entreprise active de la liste ci-dessus fonctionne, inutile d'y toucher.
+anchor_company: illuin-tech

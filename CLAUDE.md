@@ -1,5 +1,9 @@
 # SOS-JOB — garde-fous
 
+- Toute valeur modifiable par l'utilisateur (critères, entreprises, colonnes du
+  tableau, textes d'ancrage du CV) vit dans `input/` (voir `input/README.md`),
+  lue via `src/config.py`. `src/` ne doit contenir aucune valeur "à l'utilisateur"
+  en dur.
 - `input/CV_originel.tex` est la source de vérité du CV : ne jamais l'écraser
   ni le modifier par un script. Les variantes générées vivent uniquement dans
   `output/CV/`.

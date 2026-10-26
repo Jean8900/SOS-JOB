@@ -9,7 +9,7 @@ from html import escape
 from pathlib import Path
 from urllib.parse import urlencode
 
-from . import scraper
+from . import config, scraper
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "output"
@@ -50,13 +50,16 @@ def slugify_filename(text: str) -> str:
     return "".join(c if c.isalnum() else "-" for c in text.lower()).strip("-")
 
 
-def build_companies_page(query: str, language: str = "fr", output_dir: Path = DEFAULT_OUTPUT_DIR) -> Path:
+def build_companies_page(query: str, language: str | None = None, output_dir: Path = DEFAULT_OUTPUT_DIR) -> Path:
     """Scrape WTJ pour `query` (texte libre, ex: un métier) et écrit une page HTML
     listant, par ordre alphabétique, toutes les entreprises ayant au moins une
     offre correspondante -- avec un lien cliquable vers leur page jobs.
     Retourne le chemin du fichier généré.
     """
-    anchor_config = scraper.get_company_jobs_config(scraper.company_url("illuin-tech", language))
+    companies_cfg = config.load_companies()
+    language = language or companies_cfg.get("language", "fr")
+    anchor_slug = companies_cfg.get("anchor_company") or companies_cfg["companies"][0]
+    anchor_config = scraper.get_company_jobs_config(scraper.company_url(anchor_slug, language))
     companies, total_hits = _algolia_search_all(anchor_config, query)
     sorted_items = sorted(companies.items(), key=lambda kv: kv[1].casefold())
 

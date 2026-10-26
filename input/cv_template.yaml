@@ -1,0 +1,17 @@
+# Textes recherchés tels quels dans CV_originel.tex pour y injecter l'objectif
+# et la localisation adaptés à chaque offre (header du CV).
+#
+# Si tu modifies le header de CV_originel.tex et que la génération de CV
+# échoue avec "Ancre du header introuvable", mets à jour les 2 valeurs
+# ci-dessous pour qu'elles correspondent exactement au nouveau texte.
+
+subtitle_anchor: "AI Engineer -- Centrale Lyon Graduate"
+location_anchor: "Paris \\quad$\\cdot$\\quad"
+
+# Identité du candidat, utilisée pour le header/signature des LM (src/lm_builder.py).
+# Saisie à la main plutôt que déduite du .tex -- plus simple et plus fiable
+# qu'un parseur LaTeX générique.
+candidate_name: "Jean MARTINI"
+candidate_phone: "+33 7 52 02 31 20"
+candidate_email: "jean.martini8900@gmail.com"
+candidate_location: "Paris"

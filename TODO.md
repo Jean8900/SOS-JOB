@@ -3,12 +3,12 @@
 Chaque MVP est utilisable seul. On ne passe au suivant que si le précédent tourne vraiment.
 
 ## MVP1 — Scraper + matching + CV adaptés (local, terminal)
-- [x] Généraliser le scraper WTJ : liste d'entreprises suivies (`config/companies.yaml`) + recherche élargie par critères, dédoublonnage par slug
-- [x] Filtre strict selon `config/criteria.yaml` (localisation, contrat, métier, stack, séniorité) → table de résultats, max 100 lignes
+- [x] Généraliser le scraper WTJ : liste d'entreprises suivies (`input/companies.yaml`) + recherche élargie par critères, dédoublonnage par slug
+- [x] Filtre strict selon `input/criteria.yaml` (localisation, contrat, métier, stack, séniorité) → table de résultats, max 100 lignes
 - [x] TUI `textual` (cases à cocher) + `cv_builder.py` : édite le header du `.tex` de référence et compile un PDF par offre cochée (latexmk)
 
 ## MVP2 — Lettres de motivation
-- [ ] Génération LM à partir des critères + description du job, écriture dans `output/LM/`
+- [x] Génération LM via Claude Code (`claude -p`, abonnement Pro, pas d'API) → `output/LM/`, détails dans [`src/LM/`](src/LM/README.md)
 - [ ] Historique des LM passées comme guide de style (moins de review quand l'historique s'accumule)
 - [ ] Boucle de review : demande de validation explicite si peu d'historique, sinon génération directe
 

@@ -37,3 +37,8 @@ search_query_extra: ""
 
 # Nombre maximum d'offres affichées dans le tableau
 max_results: 100
+
+# Profondeur de pagination (pages de 100 résultats) côté scraping.
+# Plus haut = plus de couverture mais plus lent. Pas besoin d'y toucher au début.
+followed_max_pages: 3   # par entreprise suivie
+broad_search_max_pages: 2  # recherche élargie (tout WTJ)

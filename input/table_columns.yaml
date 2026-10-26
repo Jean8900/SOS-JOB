@@ -1,0 +1,24 @@
+# Colonnes affichées dans le tableau interactif (TUI, python run.py).
+# Réordonne, supprime ou ajoute des lignes pour changer le tableau --
+# aucun besoin de toucher au code Python.
+#
+# Champs disponibles (field) : name, company, city, contract_type, remote
+
+max_rows: 100
+
+columns:
+  - field: name
+    label: Titre
+    width: 45
+  - field: company
+    label: Entreprise
+    width: 25
+  - field: city
+    label: Lieu
+    width: 20
+  - field: contract_type
+    label: Contrat
+    width: 12
+  - field: remote
+    label: Remote
+    width: 8
