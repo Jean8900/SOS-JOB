@@ -15,6 +15,8 @@ def _matches_any_keyword(text: str, keywords: list[str]) -> bool:
 
 
 def filter_offers(offers: list[Offer], criteria: dict) -> list[Offer]:
+    if criteria.get("disable_filters"):
+        return list(offers)
     locations = criteria.get("locations") or []
     contract_types = [c.lower() for c in (criteria.get("contract_types") or [])]
     professions = criteria.get("professions") or []

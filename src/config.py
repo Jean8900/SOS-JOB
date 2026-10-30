@@ -38,5 +38,9 @@ def load_ats_companies() -> dict:
     return _load("ats_companies.yaml")
 
 
+def load_copilot() -> dict:
+    return _load("copilot.yaml")
+
+
 def load_sites() -> dict:
     return _load("sites.yaml")

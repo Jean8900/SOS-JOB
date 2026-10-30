@@ -2,6 +2,10 @@
 # tous les critères non vides pour apparaître dans le tableau.
 # Laisse une liste vide ([]) ou une valeur null pour ne pas filtrer dessus.
 
+# TEMPORAIRE : true = aucun filtre, toutes les offres collectées passent (utile
+# pour construire/tester le copilot de candidature). Remettre false ensuite.
+disable_filters: true
+
 # Villes/régions acceptées (comparé à offices[].city / state, insensible à la casse)
 locations:
   - Paris

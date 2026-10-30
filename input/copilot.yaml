@@ -1,0 +1,15 @@
+# Copilot de candidature (.\apply.ps1)
+
+# Nom des fichiers déposés dans le dossier d'upload : CV_<file_name>.pdf et
+# LM_<file_name>.pdf (toujours les mêmes noms, contenu de l'offre en cours).
+file_name: Jean_Martini
+
+# Dossier d'upload (chemin relatif à la racine du repo). Sa fenêtre
+# d'Explorateur reste ouverte au même endroit pendant toute la session.
+staging_dir: output/copilot/a_uploader
+
+# Disposition : navigateur = moitié gauche, Explorateur = quart haut droit,
+# tableau de bord d'avancement = quart bas droit. Part de la largeur d'écran
+# pour le navigateur, et part de la hauteur pour l'Explorateur.
+browser_width_ratio: 0.5
+explorer_height_ratio: 0.5

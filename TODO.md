@@ -12,6 +12,11 @@ Chaque MVP est utilisable seul. On ne passe au suivant que si le précédent tou
 - [ ] Historique des LM passées comme guide de style (moins de review quand l'historique s'accumule)
 - [ ] Boucle de review : demande de validation explicite si peu d'historique, sinon génération directe
 
+## Lot copilot — assistant de candidature (priorité)
+- [x] Dossier d'upload (`CV_` + `LM_<nom>.pdf`, mêmes noms, contenus différents) et fichier d'état des candidatures
+- [x] `apply.ps1` : Chrome / Explorateur / tableau de bord HTML disposés à l'écran, raccourcis globaux Ctrl+Alt, upload manuel
+- [ ] Remettre `disable_filters: false` (criteria.yaml) et relever `max_results_per_site`
+
 ## MVP3 — Data visualisation
 - [ ] Géocodage des localisations d'offres (ville/région → coordonnées)
 - [ ] Carte de France interactive des offres de la semaine (nouvelles offres par région/métier)

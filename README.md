@@ -56,6 +56,12 @@ Logique du filtre ([`src/matcher.py`](src/matcher.py)) :
 - Ce qui NE marche PAS : scraper directement la page web `welcometothejungle.com/fr/companies` (l'annuaire brut, sans passer par une recherche) — bloquée par un pare-feu anti-bot (403 CloudFront), et volontairement non contournée.
 - LM : générées par Claude Code en non-interactif (`claude -p`, abonnement Pro, pas de clé API séparée) — voir [`src/lm_builder.py`](src/lm_builder.py) et [`src/LM/README.md`](src/LM/README.md). Piège Windows : le prompt doit être envoyé par **stdin**, pas en argument CLI (`claude.cmd` passe par `cmd.exe`, qui tronque un argument multi-lignes au premier saut de ligne).
 
+## Lot copilot
+
+Le goulot n'est plus la collecte ni la génération, mais le geste de candidature (ouvrir la bonne page, uploader CV et LM). `.\apply.ps1` parcourt les offres générées une à une : Chrome sur l'offre (moitié gauche), Explorateur sur le dossier d'upload (quart haut droit, `CV_` / `LM_<nom>.pdf` écrasés à chaque offre), tableau de bord HTML d'avancement (quart bas droit : %, reste, par site). Raccourcis globaux, quelle que soit la fenêtre active : `Ctrl+Alt+→` candidaté, `Ctrl+Alt+←` précédente, `Ctrl+Alt+S` passer, `Ctrl+Alt+Q` quitter. Statuts enregistrés dans `output/applications.json` (suivi, pas de doublon). Tu uploades toi-même : rien n'est soumis automatiquement. Réglages : [`input/copilot.yaml`](input/copilot.yaml).
+
+> **Temporaire** : `disable_filters: true` dans [`input/criteria.yaml`](input/criteria.yaml) désactive tout le filtrage (aucune offre des 7 sites du lot 1 ne passait le filtre strict avec 5 offres/site). À remettre à `false` une fois le copilot en place.
+
 ## Roadmap
 
 Voir [`TODO.md`](TODO.md). Suggestions et contributions bienvenues, libre d'ajouter/modifier.

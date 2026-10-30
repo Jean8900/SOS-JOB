@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src import config, cv_builder, lm_builder, matcher  # noqa: E402
+from src import applications, config, cv_builder, lm_builder, matcher  # noqa: E402
 from src.offer import Offer  # noqa: E402
 from src.ui import run_selection_ui, run_site_selection_ui  # noqa: E402
 
@@ -105,6 +105,9 @@ def main() -> None:
             print(f"OK  {offer.title} ({offer.source}/{offer.company}) -> {pdf_path.relative_to(REPO_ROOT)}")
         except Exception as exc:  # noqa: BLE001
             print(f"ECHEC  {offer.title} ({offer.source}/{offer.company}): {exc}")
+
+    added = applications.register(selected)
+    print(f"=== {added} offre(s) ajoutée(s) au copilot -> .\\apply.ps1 pour candidater ===")
 
 
 if __name__ == "__main__":
