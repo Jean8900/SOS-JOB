@@ -15,6 +15,11 @@ Chaque MVP est utilisable seul. On ne passe au suivant que si le précédent tou
 ## Lot copilot — assistant de candidature (priorité)
 - [x] Dossier d'upload (`CV_` + `LM_<nom>.pdf`, mêmes noms, contenus différents) et fichier d'état des candidatures
 - [x] `apply.ps1` : Chrome / Explorateur / tableau de bord HTML disposés à l'écran, raccourcis globaux Ctrl+Alt, upload manuel
+- [x] Suivi : `suivi.ps1` génère `output/suivi.xlsx` (Date, Entreprise, Poste, Site, Lien, Notes) depuis les candidatures validées
+- [x] Suivi : colonne « Mise à jour » fusionnée devant les Notes (`update // legacy`), lignes manuelles conservées
+- [ ] Suivi : colonnes réponse / relance J+7, pré-remplies via Gmail en lecture seule
+- [ ] ATS : valider les correspondances entreprise -> board (faux positifs possibles, ex. « vinci » sur Ashby) + liste d'exclusions
+- [ ] Plafond `max_results` : répartir par site (avec `disable_filters`, les derniers sites sont coupés)
 - [ ] Remettre `disable_filters: false` (criteria.yaml) et relever `max_results_per_site`
 
 ## MVP3 — Data visualisation

@@ -11,6 +11,8 @@ Customable script to help you to knowning the trend of job market and candidate 
 .\run.ps1 all                  # pas de TUI, prend toutes les offres filtrées
 .\run.ps1 force                # régénère les LM même si déjà archivées
 .\run.ps1 sites all force      # combinables, dans n'importe quel ordre
+.\apply.ps1                    # copilot de candidature (voir "Lot copilot")
+.\suivi.ps1                    # génère output/suivi.xlsx (une ligne par candidature). Tape une info dans « Mise à jour » : à la prochaine génération elle passe devant Notes ("update // historique"). Tes lignes ajoutées à la main sont conservées. Nécessite Excel/LibreOffice, ou import dans Google Sheets
 .\archive_lm.ps1                # déplace toutes les LM générées vers l'archive (écrase les doublons)
 ```
 Points d'entrée : [`list_companies.py`](list_companies.py), [`run.py`](run.py), [`archive_lm.py`](archive_lm.py).
@@ -61,6 +63,10 @@ Logique du filtre ([`src/matcher.py`](src/matcher.py)) :
 Le goulot n'est plus la collecte ni la génération, mais le geste de candidature (ouvrir la bonne page, uploader CV et LM). `.\apply.ps1` parcourt les offres générées une à une : Chrome sur l'offre (moitié gauche), Explorateur sur le dossier d'upload (quart haut droit, `CV_` / `LM_<nom>.pdf` écrasés à chaque offre), tableau de bord HTML d'avancement (quart bas droit : %, reste, par site). Raccourcis globaux, quelle que soit la fenêtre active : `Ctrl+Alt+→` candidaté, `Ctrl+Alt+←` précédente, `Ctrl+Alt+S` passer, `Ctrl+Alt+Q` quitter. Statuts enregistrés dans `output/applications.json` (suivi, pas de doublon). Tu uploades toi-même : rien n'est soumis automatiquement. Réglages : [`input/copilot.yaml`](input/copilot.yaml).
 
 > **Temporaire** : `disable_filters: true` dans [`input/criteria.yaml`](input/criteria.yaml) désactive tout le filtrage (aucune offre des 7 sites du lot 1 ne passait le filtre strict avec 5 offres/site). À remettre à `false` une fois le copilot en place.
+
+## Suivi des candidatures (début)
+
+Chaque Ctrl+Alt+→ du copilot enregistre la candidature dans `output/applications.json` (date de la première candidature conservée). `.\suivi.ps1` en tire `output/suivi.xlsx` : une ligne par offre candidatée, une colonne « Mise à jour » où tu tapes le dernier état (entretien, refus...) qui passe devant l'historique de Notes (`update // legacy`), et tes propres lignes hors outil sont conservées. Tout reste local. Excel ou LibreOffice requis (ou import dans Google Sheets).
 
 ## Roadmap
 
