@@ -1,0 +1,24 @@
+# Lot 1.5 : entreprises interrogées via leur ATS (Greenhouse / Lever / Ashby).
+#
+# Ces ATS n'ont pas de recherche globale : il faut savoir, pour chaque
+# entreprise, quel ATS elle utilise et son identifiant ("token", la partie de
+# son URL de carrière, ex. jobs.lever.co/<token>).
+#
+# La liste est construite automatiquement : on cherche les entreprises WTJ qui
+# ont des offres pour chaque requête de `discovery_queries`, puis on teste si
+# leur nom correspond à un board Greenhouse / Lever / Ashby. Le résultat est
+# mis en cache dans output/ats_cache.json (régénérable, supprime-le pour tout
+# refaire).
+
+discovery_queries:
+  - AI Engineer
+
+# Nombre maximum d'offres gardées par entreprise (celles dont le titre
+# correspond à un métier de criteria.yaml passent en premier).
+max_offers_per_company: 5
+
+# Ajouts / corrections manuelles, prioritaires sur la découverte automatique.
+# ats : greenhouse | lever | ashby
+# Exemple :
+#   - {name: "Mistral AI", ats: lever, token: mistral}
+companies: []

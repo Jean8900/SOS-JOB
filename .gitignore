@@ -12,3 +12,12 @@ output/LM/*
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# --- Secrets (filet de sécurité, normalement hors repo) ---
+.env
+*.env
+.sos-job/
+credentials.json
+token.json
+client_secret*.json
+output/ats_cache.json

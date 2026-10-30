@@ -35,6 +35,10 @@ seniority: []
 # en plus de "professions" + "stack". Laisse vide si tu ne veux rien ajouter.
 search_query_extra: ""
 
+# Entreprises à exclure des résultats (mot-clé cherché dans le nom affiché)
+excluded_companies:
+  - illuin
+
 # Nombre maximum d'offres affichées dans le tableau
 max_results: 100
 

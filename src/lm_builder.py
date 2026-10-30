@@ -14,14 +14,27 @@ import subprocess
 from pathlib import Path
 
 from . import config, cv_builder
+from .offer import Offer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TEX = REPO_ROOT / "input" / "CV_originel.tex"
 SIGNATURE_PNG = REPO_ROOT / "input" / "LM" / "Signature.png"
-OUTPUT_TEX_DIR = REPO_ROOT / "output" / "LM" / "tex"
-OUTPUT_PDF_DIR = REPO_ROOT / "output" / "LM" / "pdf"
-ARCHIVE_TEX_DIR = REPO_ROOT / "output" / "LM" / "archive" / "tex"
-ARCHIVE_PDF_DIR = REPO_ROOT / "output" / "LM" / "archive" / "pdf"
+OUTPUT_TEX_ROOT = REPO_ROOT / "output" / "LM" / "tex"
+OUTPUT_PDF_ROOT = REPO_ROOT / "output" / "LM" / "pdf"
+ARCHIVE_TEX_ROOT = REPO_ROOT / "output" / "LM" / "archive" / "tex"
+ARCHIVE_PDF_ROOT = REPO_ROOT / "output" / "LM" / "archive" / "pdf"
+
+
+def tex_dir_for_source(source: str) -> Path:
+    return OUTPUT_TEX_ROOT / source
+
+
+def pdf_dir_for_source(source: str) -> Path:
+    return OUTPUT_PDF_ROOT / source
+
+
+def archive_pdf_dir_for_source(source: str) -> Path:
+    return ARCHIVE_PDF_ROOT / source
 
 
 def _latex_to_text(tex: str) -> str:
@@ -54,9 +67,8 @@ def extract_cv_facts(reference_text: str | None = None) -> str:
     return "\n".join(f"- {fact}" for fact in facts if fact)
 
 
-def _job_description_text(job: dict) -> str:
-    from . import scraper
-    return scraper.html_to_text(job.get("description"))[:3000]
+def _job_description_text(offer: Offer) -> str:
+    return offer.description[:3000]
 
 
 def _find_claude() -> str:
@@ -71,16 +83,16 @@ _ATOUTS_MARKER = "###ATOUTS###"
 _ENTREPRISE_MARKER = "###ENTREPRISE###"
 
 
-def generate_blanks(job: dict, cv_facts: str) -> dict:
+def generate_blanks(offer: Offer, cv_facts: str) -> dict:
     """Appelle `claude -p` (abonnement Pro, aucune clé API) pour remplir les
     2 blancs de la LM. Sortie texte avec délimiteurs explicites -- plus fiable
     sur un prompt long que --json-schema (qui peut être ignoré par le modèle)."""
     prompt = f"""Tu rédiges 2 paragraphes courts d'une lettre de motivation, à partir UNIQUEMENT des faits vérifiés ci-dessous. N'invente RIEN : aucun fait, aucun chiffre, aucune techno qui n'y figure pas.
 
 OFFRE :
-Poste : {job.get('name')}
-Entreprise : {(job.get('organization') or {}).get('name', '')}
-Description : {_job_description_text(job)}
+Poste : {offer.title}
+Entreprise : {offer.company}
+Description : {_job_description_text(offer)}
 
 FAITS VÉRIFIÉS DU CANDIDAT (seule source autorisée) :
 {cv_facts}
@@ -153,12 +165,12 @@ Je me tiens à votre disposition pour échanger plus en détail sur ma candidatu
 """
 
 
-def render_lm_tex(job: dict, blanks: dict) -> str:
+def render_lm_tex(offer: Offer, blanks: dict) -> str:
     identity = config.load_cv_template()
     name = identity["candidate_name"]
     contact = f"{identity['candidate_location']} · {identity['candidate_phone']} · {identity['candidate_email']}"
-    company_name = (job.get("organization") or {}).get("name", "")
-    job_title = job.get("name") or ""
+    company_name = offer.company
+    job_title = offer.title
 
     if SIGNATURE_PNG.exists():
         signature_block = f"\\includegraphics[height=2cm]{{{SIGNATURE_PNG.as_posix()}}}"
@@ -176,23 +188,26 @@ def render_lm_tex(job: dict, blanks: dict) -> str:
     )
 
 
-def basename_for_job(job: dict, company_slug: str) -> str:
-    return f"{cv_builder.slugify(company_slug)}_{cv_builder.slugify(job.get('slug') or job.get('name', 'job'))}"
+def basename_for_job(offer: Offer) -> str:
+    return cv_builder.basename_for_offer(offer)
 
 
-def is_archived(basename: str) -> bool:
-    return (ARCHIVE_PDF_DIR / f"{basename}.pdf").exists()
+def is_archived(offer: Offer) -> bool:
+    basename = basename_for_job(offer)
+    return (archive_pdf_dir_for_source(offer.source) / f"{basename}.pdf").exists()
 
 
-def generate_lm_for_job(job: dict, company_slug: str) -> Path:
-    OUTPUT_TEX_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PDF_DIR.mkdir(parents=True, exist_ok=True)
-    basename = basename_for_job(job, company_slug)
+def generate_lm_for_job(offer: Offer) -> Path:
+    tex_dir = tex_dir_for_source(offer.source)
+    pdf_dir = pdf_dir_for_source(offer.source)
+    tex_dir.mkdir(parents=True, exist_ok=True)
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    basename = basename_for_job(offer)
 
     cv_facts = extract_cv_facts()
-    blanks = generate_blanks(job, cv_facts)
-    tex_content = render_lm_tex(job, blanks)
+    blanks = generate_blanks(offer, cv_facts)
+    tex_content = render_lm_tex(offer, blanks)
 
-    tex_path = OUTPUT_TEX_DIR / f"{basename}.tex"
+    tex_path = tex_dir / f"{basename}.tex"
     tex_path.write_text(tex_content, encoding="utf-8")
-    return cv_builder.compile_pdf(tex_path, OUTPUT_PDF_DIR)
+    return cv_builder.compile_pdf(tex_path, pdf_dir)

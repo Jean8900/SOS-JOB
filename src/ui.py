@@ -12,31 +12,18 @@ from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Footer, Header
 
 from . import config
-
-
-def _job_city(job: dict) -> str:
-    offices = job.get("offices") or ([job["office"]] if job.get("office") else [])
-    for office in offices:
-        if office and office.get("city"):
-            return office["city"]
-    if job.get("remote") in ("full", "partial"):
-        return "Remote"
-    return "?"
-
-
-def _job_company(job: dict) -> str:
-    org = job.get("organization") or {}
-    return org.get("name") or job.get("_source_company_slug") or "?"
+from .offer import Offer
 
 
 # Champs disponibles pour input/table_columns.yaml -- voir le commentaire en tête
-# de ce fichier yaml pour la liste à jour.
+# de ce fichier yaml pour la liste à jour. Accès direct : le schéma Offer est
+# déjà plat, plus besoin d'extraire quoi que ce soit d'une forme brute de site.
 FIELD_GETTERS = {
-    "name": lambda job: job.get("name") or "",
-    "company": _job_company,
-    "city": _job_city,
-    "contract_type": lambda job: str(job.get("contract_type") or ""),
-    "remote": lambda job: str(job.get("remote") or ""),
+    "name": lambda offer: offer.title,
+    "company": lambda offer: offer.company,
+    "city": lambda offer: offer.location,
+    "contract_type": lambda offer: offer.contract_type,
+    "source": lambda offer: offer.source,
 }
 
 
@@ -50,7 +37,7 @@ class JobTableApp(App):
     DataTable { height: 1fr; }
     """
 
-    def __init__(self, jobs: list[dict]) -> None:
+    def __init__(self, jobs: list[Offer]) -> None:
         super().__init__()
         table_cfg = config.load_table_columns()
         self.columns = table_cfg["columns"]
@@ -58,7 +45,7 @@ class JobTableApp(App):
         self.jobs = jobs[:max_rows]
         self.max_rows = max_rows
         self.checked: set[int] = set()
-        self.selected_jobs: list[dict] = []
+        self.selected_jobs: list[Offer] = []
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -100,7 +87,66 @@ class JobTableApp(App):
         self.exit()
 
 
-def run_selection_ui(jobs: list[dict]) -> list[dict]:
+def run_selection_ui(jobs: list[Offer]) -> list[Offer]:
     app = JobTableApp(jobs)
     app.run()
     return app.selected_jobs
+
+
+class SiteSelectionApp(App):
+    """Liste à cocher pour choisir les sites à interroger (suffixe `sites` de run.ps1)."""
+
+    BINDINGS = [
+        Binding("space", "toggle", "Cocher/décocher"),
+        Binding("enter", "submit", "Valider la sélection", priority=True),
+        Binding("q", "quit_without", "Quitter sans rien faire"),
+    ]
+    CSS = """
+    DataTable { height: 1fr; }
+    """
+
+    def __init__(self, sites: list[dict]) -> None:
+        super().__init__()
+        self.sites = sites
+        self.checked: set[int] = set()
+        self.selected_sites: list[dict] = []
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield DataTable(cursor_type="row")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.title = f"Choisis les sites à interroger ({len(self.sites)} disponibles)"
+        table = self.query_one(DataTable)
+        table.add_columns(" ", "Site")
+        for site in self.sites:
+            table.add_row("[ ]", site.get("name") or site["slug"])
+        table.focus()
+
+    def action_toggle(self) -> None:
+        table = self.query_one(DataTable)
+        row_index = table.cursor_row
+        if row_index is None:
+            return
+        if row_index in self.checked:
+            self.checked.discard(row_index)
+            mark = "[ ]"
+        else:
+            self.checked.add(row_index)
+            mark = "[x]"
+        table.update_cell_at(Coordinate(row_index, 0), mark)
+
+    def action_submit(self) -> None:
+        self.selected_sites = [self.sites[i] for i in sorted(self.checked)]
+        self.exit()
+
+    def action_quit_without(self) -> None:
+        self.selected_sites = []
+        self.exit()
+
+
+def run_site_selection_ui(sites: list[dict]) -> list[dict]:
+    app = SiteSelectionApp(sites)
+    app.run()
+    return app.selected_sites

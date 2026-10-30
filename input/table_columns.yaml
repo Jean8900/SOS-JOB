@@ -2,7 +2,7 @@
 # Réordonne, supprime ou ajoute des lignes pour changer le tableau --
 # aucun besoin de toucher au code Python.
 #
-# Champs disponibles (field) : name, company, city, contract_type, remote
+# Champs disponibles (field) : name, company, city, contract_type, source
 
 max_rows: 100
 
@@ -19,6 +19,6 @@ columns:
   - field: contract_type
     label: Contrat
     width: 12
-  - field: remote
-    label: Remote
-    width: 8
+  - field: source
+    label: Source
+    width: 12

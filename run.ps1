@@ -1,8 +1,10 @@
-# Lance le pipeline SOS-JOB complet : scrape -> filtre -> TUI -> génère CV + LM.
+# Lance le pipeline SOS-JOB complet : collecte (tous les sites actifs, ou
+# choisis) -> filtre -> TUI -> génère CV + LM.
 # Usage : .\run.ps1               (depuis la racine du repo)
+#         .\run.ps1 sites         (liste à cocher pour choisir les sites)
 #         .\run.ps1 all           (pas de TUI, toutes les offres filtrées)
 #         .\run.ps1 force         (régénère les LM même si déjà archivées)
-#         .\run.ps1 all force     (les deux, combinables dans n'importe quel ordre)
+#         .\run.ps1 sites all force   (combinables, dans n'importe quel ordre)
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot

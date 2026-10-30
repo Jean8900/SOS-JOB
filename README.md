@@ -6,13 +6,32 @@ Customable script to help you to knowning the trend of job market and candidate 
 ```powershell
 .\companies.ps1                # liste des entreprises par métier (ouvre un .html)
 .\companies.ps1 "AI Engineer"  # métier au choix
-.\run.ps1                      # scrape -> filtre -> TUI -> génère CV + LM
+.\run.ps1                      # tous les sites actifs -> filtre -> TUI -> génère CV + LM
+.\run.ps1 sites                # liste à cocher pour choisir les sites à interroger
 .\run.ps1 all                  # pas de TUI, prend toutes les offres filtrées
 .\run.ps1 force                # régénère les LM même si déjà archivées
-.\run.ps1 all force            # combinables, dans n'importe quel ordre
+.\run.ps1 sites all force      # combinables, dans n'importe quel ordre
 .\archive_lm.ps1                # déplace toutes les LM générées vers l'archive (écrase les doublons)
 ```
 Points d'entrée : [`list_companies.py`](list_companies.py), [`run.py`](run.py), [`archive_lm.py`](archive_lm.py).
+
+## Sources (lot 1)
+
+Chaque site vit dans [`src/connectors/<slug>.py`](src/connectors), convertit ses données brutes en [`Offer`](src/offer.py) (schéma unique, voir ce fichier), et expose `fetch(max_results) -> list[Offer]`. Liste et activation : [`input/sites.yaml`](input/sites.yaml).
+
+| Site | Statut | Détail |
+|---|---|---|
+| Welcome to the Jungle | ✅ actif | entreprises suivies + recherche élargie (API publique) |
+| Free-Work | ✅ actif | API JSON interne (`/api/job_postings`), pas d'anti-bot rencontré |
+| Choisir le service public | ✅ actif | API REST custom WordPress ; **limite connue** : le filtre mot-clé serveur n'a pas d'effet mesuré, le filtrage se fait entièrement côté `matcher.py` |
+| Inria | ✅ actif | formulaire HTML server-rendu (session + jeton CSRF) ; une requête = un mot-clé (le site traite une phrase en ET, pas en OU) |
+| CNRS | ✅ actif | idem Inria (POST direct, pas de session nécessaire ici) |
+| Station F | ✅ actif | plateforme WelcomeKit/Algolia ; la clé de recherche n'est injectée que côté client (JS), donc navigateur headless (Playwright, voir `src/connectors/browser.py`) au lieu d'appeler l'API directement |
+| Jobs that make sense | ✅ actif | Nuxt 3, données sérialisées côté serveur -- illisible en HTML brut, même principe Playwright ; le paramètre `query` n'a pas d'effet de filtre mesurable, tri entièrement côté `matcher.py` |
+| Greenhouse / Lever / Ashby | ✅ actif (lot 1.5) | APIs publiques par entreprise, sans clé ni anti-bot. Pas de recherche globale : les entreprises viennent de WTJ (`discovery_queries` dans [`input/ats_companies.yaml`](input/ats_companies.yaml), par défaut « AI Engineer »), puis on teste si leur nom correspond à un board sur l'un des 3 ATS (~20 % retrouvées, les autres utilisent un ATS maison/Workday/etc.). Résultat en cache dans `output/ats_cache.json` (1re exécution ~3 min, ensuite instantané). Max 5 offres par entreprise (celles dont le titre colle aux métiers d'abord). Ajout/correction manuelle possible via `companies:` dans le même fichier. **Limite connue** : Greenhouse n'expose pas le type de contrat, déduit du titre (stage/alternance, sinon CDI). Code commun : [`src/connectors/ats.py`](src/connectors/ats.py) |
+| aijobs.net (Foorilla, rebrandé en octobre 2026) | ❌ bloqué | le site a été refondu : nom d'entreprise tronqué (`@ I...`) et export en masse réservés aux comptes connectés -- plus un problème de rendu JS mais une vraie barrière d'inscription, pas de création de compte automatique |
+
+Station F et Jobs that make sense utilisent un navigateur headless (Playwright) plutôt qu'un appel HTTP direct -- `pip install -r requirements.txt` puis, une seule fois, `playwright install chromium`. aijobs.net est mis de côté (lot 1.5, on y reviendra peut-être) : il reste dans `input/sites.yaml` (`enabled: false`), choisissable via le suffixe `sites`, mais aucun module `src/connectors/*.py` n'existe tant que le blocage n'est pas levé. ChooseYourBoss (pare-feu anti-bot Cloudflare, 403 dès la requête de base) est passé en lot 2 : alerte email côté site, voir [`TODO.md`](TODO.md).
 
 Par défaut, une LM déjà présente dans `output/LM/archive/` n'est pas régénérée — c'est voulu, pour ne pas écraser une lettre déjà relue/envoyée. Utilise `force` pour passer outre. `output/LM/` : `tex/` et `pdf/` pour le lot du jour, `archive/{tex,pdf}/` pour tout ce qui a déjà été traité.
 

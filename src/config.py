@@ -32,3 +32,11 @@ def load_table_columns() -> dict:
 
 def load_cv_template() -> dict:
     return _load("cv_template.yaml")
+
+
+def load_ats_companies() -> dict:
+    return _load("ats_companies.yaml")
+
+
+def load_sites() -> dict:
+    return _load("sites.yaml")

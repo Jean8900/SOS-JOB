@@ -1,0 +1,46 @@
+# Liste des sites interrogés par .\run.ps1.
+#
+# - Sans suffixe : run.ps1 interroge tous les sites `enabled: true`.
+# - Suffixe `sites` : liste à cocher pour choisir parmi tous les sites ci-dessous
+#   (même ceux désactivés).
+# - `slug` doit correspondre à un module src/connectors/<slug>.py exposant
+#   fetch(max_results) -> list[Offer].
+# - `enabled: false` = connecteur pas encore prêt (voir TODO.md) -- laissé dans
+#   la liste pour pouvoir le choisir explicitement via le suffixe `sites`.
+
+max_results_per_site: 5
+
+sites:
+  - slug: welcome_to_the_jungle
+    name: "Welcome to the Jungle"
+    enabled: true
+  - slug: free_work
+    name: "Free-Work"
+    enabled: true
+  - slug: station_f
+    name: "Station F"
+    enabled: true
+  - slug: choisir_service_public
+    name: "Choisir le service public"
+    enabled: true
+  - slug: inria
+    name: "Inria"
+    enabled: true
+  - slug: cnrs
+    name: "CNRS"
+    enabled: true
+  - slug: jobs_that_make_sense
+    name: "Jobs that make sense"
+    enabled: true
+  - slug: greenhouse
+    name: "Greenhouse (entreprises WTJ)"
+    enabled: true
+  - slug: lever
+    name: "Lever (entreprises WTJ)"
+    enabled: true
+  - slug: ashby
+    name: "Ashby (entreprises WTJ)"
+    enabled: true
+  - slug: aijobs_net
+    name: "aijobs.net"
+    enabled: false

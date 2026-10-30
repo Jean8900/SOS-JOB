@@ -15,11 +15,20 @@ import subprocess
 from pathlib import Path
 
 from . import config
+from .offer import Offer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TEX = REPO_ROOT / "input" / "CV_originel.tex"
-OUTPUT_TEX_DIR = REPO_ROOT / "output" / "CV" / "tex"
-OUTPUT_PDF_DIR = REPO_ROOT / "output" / "CV" / "pdf"
+OUTPUT_TEX_ROOT = REPO_ROOT / "output" / "CV" / "tex"
+OUTPUT_PDF_ROOT = REPO_ROOT / "output" / "CV" / "pdf"
+
+
+def tex_dir_for_source(source: str) -> Path:
+    return OUTPUT_TEX_ROOT / source
+
+
+def pdf_dir_for_source(source: str) -> Path:
+    return OUTPUT_PDF_ROOT / source
 
 _LATEX_SPECIAL_CHARS = {
     "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_",
@@ -35,26 +44,6 @@ def escape_latex(text: str) -> str:
 def slugify(text: str) -> str:
     text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
     return text or "job"
-
-
-def _job_city(job: dict) -> str:
-    offices = job.get("offices") or ([job["office"]] if job.get("office") else [])
-    for office in offices:
-        if office and office.get("city"):
-            return office["city"]
-    if job.get("remote") in ("full", "partial"):
-        return "Remote"
-    return "France"
-
-
-def _job_role_label(job: dict) -> str:
-    profession = job.get("profession") or {}
-    category_name = profession.get("category_name") or {}
-    label = category_name.get("en") or category_name.get("fr")
-    if label:
-        return label
-    name = job.get("name") or ""
-    return " ".join(name.split()[:4]) or "Open to new opportunities"
 
 
 def render_header(reference_text: str, objective: str, location: str) -> str:
@@ -85,10 +74,11 @@ def render_header(reference_text: str, objective: str, location: str) -> str:
     return reference_text[:header_start] + new_header_block + reference_text[header_end:]
 
 
-def build_tex_for_job(job: dict, reference_text: str | None = None) -> str:
+def build_tex_for_job(offer: Offer, reference_text: str | None = None) -> str:
     reference_text = reference_text if reference_text is not None else REFERENCE_TEX.read_text(encoding="utf-8")
-    objective = f"{_job_role_label(job)} -- Open to {_job_city(job)}"
-    return render_header(reference_text, objective, _job_city(job))
+    location = offer.location or "France"
+    objective = f"{offer.title} -- Open to {location}"
+    return render_header(reference_text, objective, location)
 
 
 def _find_latexmk() -> str:
@@ -142,11 +132,17 @@ def compile_pdf(tex_path: Path, pdf_dir: Path) -> Path:
     return pdf_path
 
 
-def generate_cv_for_job(job: dict, company_slug: str) -> Path:
-    OUTPUT_TEX_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PDF_DIR.mkdir(parents=True, exist_ok=True)
-    basename = f"{slugify(company_slug)}_{slugify(job.get('slug') or job.get('name', 'job'))}"
-    tex_content = build_tex_for_job(job)
-    tex_path = OUTPUT_TEX_DIR / f"{basename}.tex"
+def basename_for_offer(offer: Offer) -> str:
+    return f"{slugify(offer.company)}_{slugify(offer.source_id or offer.title)}"
+
+
+def generate_cv_for_job(offer: Offer) -> Path:
+    tex_dir = tex_dir_for_source(offer.source)
+    pdf_dir = pdf_dir_for_source(offer.source)
+    tex_dir.mkdir(parents=True, exist_ok=True)
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    basename = basename_for_offer(offer)
+    tex_content = build_tex_for_job(offer)
+    tex_path = tex_dir / f"{basename}.tex"
     tex_path.write_text(tex_content, encoding="utf-8")
-    return compile_pdf(tex_path, OUTPUT_PDF_DIR)
+    return compile_pdf(tex_path, pdf_dir)

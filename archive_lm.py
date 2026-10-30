@@ -16,22 +16,27 @@ from src import lm_builder  # noqa: E402
 
 
 def archive_all() -> int:
+    """Archive par site : output/LM/{tex,pdf}/<source>/* -> archive/{tex,pdf}/<source>/*."""
     moved = 0
-    for src_dir, dst_dir in (
-        (lm_builder.OUTPUT_TEX_DIR, lm_builder.ARCHIVE_TEX_DIR),
-        (lm_builder.OUTPUT_PDF_DIR, lm_builder.ARCHIVE_PDF_DIR),
+    for output_root, archive_root in (
+        (lm_builder.OUTPUT_TEX_ROOT, lm_builder.ARCHIVE_TEX_ROOT),
+        (lm_builder.OUTPUT_PDF_ROOT, lm_builder.ARCHIVE_PDF_ROOT),
     ):
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        if not src_dir.exists():
+        if not output_root.exists():
             continue
-        for f in src_dir.iterdir():
-            if not f.is_file() or f.name == ".gitkeep":
+        for source_dir in output_root.iterdir():
+            if not source_dir.is_dir():
                 continue
-            dst = dst_dir / f.name
-            if dst.exists():
-                dst.unlink()
-            shutil.move(str(f), str(dst))
-            moved += 1
+            dst_dir = archive_root / source_dir.name
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            for f in source_dir.iterdir():
+                if not f.is_file() or f.name == ".gitkeep":
+                    continue
+                dst = dst_dir / f.name
+                if dst.exists():
+                    dst.unlink()
+                shutil.move(str(f), str(dst))
+                moved += 1
     return moved
 
 
