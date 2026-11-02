@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>Test multi-étapes</title>
+<body style="font:16px sans-serif;padding:30px">
+<h1 id="h">Vos informations</h1>
+<div id="s1"><label>Prénom <input name="first_name"></label><br><br><label>Nom <input name="last_name"></label><br><br>
+<label>Email <input name="email" type="email"></label><br><br><button id="b1" type="button">Enregistrer et continuer</button></div>
+<div id="s2" hidden><label>Pourquoi ce poste ? (max 300 caractères) <textarea name="why" maxlength="300" rows="4" cols="60"></textarea></label><br><br>
+<button type="button" id="b2">Suivant</button></div>
+<div id="s3" hidden><p>Tout est prêt.</p><button type="button" id="b3" onclick="document.title='SUBMITTED'">Submit application</button></div>
+<script>
+b1.onclick=()=>{s1.hidden=true;s2.hidden=false;h.textContent='Questions';};
+b2.onclick=()=>{s2.hidden=true;s3.hidden=false;h.textContent='Réviser votre candidature';};
+</script></body>

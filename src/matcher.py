@@ -15,14 +15,15 @@ def _matches_any_keyword(text: str, keywords: list[str]) -> bool:
 
 
 def filter_offers(offers: list[Offer], criteria: dict) -> list[Offer]:
+    excluded_companies = criteria.get("excluded_companies") or []
     if criteria.get("disable_filters"):
-        return list(offers)
+        # Même sans filtre, les entreprises exclues (ex. ton employeur actuel) ne ressortent jamais.
+        return [o for o in offers if not _matches_any_keyword(o.company, excluded_companies)] if excluded_companies else list(offers)
     locations = criteria.get("locations") or []
     contract_types = [c.lower() for c in (criteria.get("contract_types") or [])]
     professions = criteria.get("professions") or []
     stack = criteria.get("stack") or []
     seniority = criteria.get("seniority") or []
-    excluded_companies = criteria.get("excluded_companies") or []
 
     kept = []
     for offer in offers:

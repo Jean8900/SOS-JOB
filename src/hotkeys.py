@@ -15,11 +15,12 @@ kernel32 = ctypes.windll.kernel32
 _MOD_ALT, _MOD_CONTROL, _MOD_NOREPEAT = 0x0001, 0x0002, 0x4000
 _WM_HOTKEY, _WM_QUIT = 0x0312, 0x0012
 
-KEYS = {"right": 0x27, "left": 0x25, "skip": 0x53, "quit": 0x51}  # flèche droite/gauche, S, Q
+KEYS = {"right": 0x27, "left": 0x25, "skip": 0x53, "quit": 0x51, "fill": 0x46}  # flèche droite/gauche, S, Q, F
 
 
 class HotkeyListener:
-    def __init__(self) -> None:
+    def __init__(self, keys: dict[str, int] | None = None) -> None:
+        self._keys = keys or KEYS
         self.actions: queue.Queue[str] = queue.Queue()
         self.failed: list[str] = []
         self._ready = threading.Event()
@@ -33,7 +34,7 @@ class HotkeyListener:
     def _run(self) -> None:
         self._thread_id = kernel32.GetCurrentThreadId()
         by_id = {}
-        for i, (action, vk) in enumerate(KEYS.items(), start=1):
+        for i, (action, vk) in enumerate(self._keys.items(), start=1):
             if user32.RegisterHotKey(None, i, _MOD_CONTROL | _MOD_ALT | _MOD_NOREPEAT, vk):
                 by_id[i] = action
             else:

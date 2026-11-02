@@ -61,7 +61,10 @@ def build_companies_page(query: str, language: str | None = None, output_dir: Pa
     anchor_slug = companies_cfg.get("anchor_company") or companies_cfg["companies"][0]
     anchor_config = scraper.get_company_jobs_config(scraper.company_url(anchor_slug, language))
     companies, total_hits = _algolia_search_all(anchor_config, query)
-    sorted_items = sorted(companies.items(), key=lambda kv: kv[1].casefold())
+    excluded = [e.lower() for e in (config.load_criteria().get("excluded_companies") or [])]
+    sorted_items = sorted(((slug, name) for slug, name in companies.items()
+                           if not any(e in name.lower() for e in excluded)),
+                          key=lambda kv: kv[1].casefold())
 
     rows = "\n".join(
         f'    <li><a href="{escape(scraper.company_url(slug, language))}" target="_blank" rel="noopener">{escape(name)}</a></li>'

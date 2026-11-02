@@ -1,0 +1,30 @@
+# SOS-JOB — règles pour Cline
+
+## Stack
+- Python 3.13, Windows / PowerShell. Dépendances : `requirements.txt`.
+- Point d'entrée : `python run.py` (ou `run.ps1`). Code dans `src/`.
+- Notebooks d'expérimentation dans `sandbox/` (exécutés via `jupyter nbconvert --execute`).
+
+## Garde-fous (identiques à CLAUDE.md)
+- Toute valeur modifiable par l'utilisateur vit dans `input/` (voir `input/README.md`),
+  lue via `src/config.py`. Aucune valeur "utilisateur" en dur dans `src/`.
+- `input/CV_originel.tex` est la source de vérité : ne jamais l'écraser ni le modifier.
+  Les variantes générées vivent uniquement dans `output/CV/`.
+- Tout texte dynamique injecté dans un `.tex` passe par `cv_builder.escape_latex()`.
+- Une entreprise qui échoue au scraping (`src/scraper.py`) ne doit jamais interrompre
+  les autres : logguer l'erreur et continuer.
+- `output/CV/` et `output/LM/` ne sont pas versionnés.
+
+## Secrets
+- Les secrets sont dans `~/.sos-job/.env` (hors repo). Ne jamais lire, afficher,
+  copier ni committer ce fichier ni son contenu. Charger via `python-dotenv`.
+
+## Conventions
+- Commentaires et messages en français, code et identifiants en anglais.
+- Changements minimaux et ciblés ; pas de refactor non demandé.
+- Ne jamais committer ni pousser sans demande explicite.
+
+## Vérification
+- Lancer `python run.py` après une modification du pipeline.
+- Avant un commit, relire `git diff` sur les `.tex` générés/modifiés (échappement LaTeX).
+- Console : définir `PYTHONIOENCODING=utf-8` si accents/emojis plantent la sortie.

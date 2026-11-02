@@ -44,3 +44,11 @@ def load_copilot() -> dict:
 
 def load_sites() -> dict:
     return _load("sites.yaml")
+
+
+def load_form_profile() -> dict:
+    """Infos perso réservées aux formulaires (adresse...) : input/form_profile.yaml, absent = aucune info."""
+    try:
+        return _load("form_profile.yaml") or {}
+    except FileNotFoundError:
+        return {}

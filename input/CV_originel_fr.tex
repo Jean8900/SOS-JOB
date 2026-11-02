@@ -1,0 +1,133 @@
+
+\documentclass[10pt, a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1.2cm]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage[explicit]{titlesec}
+\usepackage{xcolor}
+\usepackage{fontawesome5}
+\usepackage{lmodern}
+
+% --- COLOR DEFINITIONS ---
+\definecolor{primary}{RGB}{30, 50, 90}      % Navy Blue accent
+\definecolor{textdark}{RGB}{40, 40, 40}    % Dark Charcoal for text
+\definecolor{subtle}{RGB}{100, 100, 100}  % Grey for muted text
+
+% --- SETUP & STYLING ---
+\pagestyle{empty}
+\color{textdark}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    urlcolor=primary
+}
+
+% Custom section formatting
+\titleformat{\section}
+  {\color{primary}\large\bfseries}
+  {}{0em}
+  {\MakeUppercase{#1}}
+  [\color{primary}\titlerule]
+
+\titlespacing*{\section}{0pt}{8pt}{4pt}
+
+% Custom list parameters
+\setlist[itemize]{leftmargin=*, parsep=0pt, itemsep=2pt, topsep=1pt}
+
+% --- DOCUMENT BEGIN ---
+\begin{document}
+
+% --- HEADER ---
+\begin{center}
+    {\Huge \bfseries \color{primary} Jean MARTINI}\\[4pt]
+    {\large \bfseries Ingénieur IA -- Diplômé de Centrale Lyon}\\[6pt]
+    \small
+    Paris \quad$\cdot$\quad 
+    +33 7 52 02 31 20 \quad$\cdot$\quad 
+    \href{mailto:jean.martini8900@gmail.com}{jean.martini8900@gmail.com} \quad$\cdot$\quad 
+    Permis B\\[2pt]
+    \href{https://linkedin.com/in/jean-martini-64a017228/}{\faLinkedin\ LinkedIn} \quad$\cdot$\quad 
+    \href{https://github.com/Jean8900}{\faGithub\ GitHub}
+\end{center}
+
+% --- PROFILE ---
+\section{Profil}
+Diplômé de Centrale Lyon (2025), spécialisé en modélisation prédictive, vision par ordinateur et grands modèles de langage (LLM). Participant actif à des hackathons d'IA (1\,750 € remportés). Actuellement Data Scientist / Ingénieur IA chez Illuin Technology.\\[3pt]
+\textbf{Tech Stack:} Python, PyTorch, scikit-learn, XGBoost, OpenCV, Flask, Docker, SQL, Plotly, Git, Mistral API\\
+\textbf{Langues :} Français (langue maternelle) \quad$\cdot$\quad Anglais (C1) \quad$\cdot$\quad Espagnol (B1) \quad$\cdot$\quad Japonais (A2)
+
+% --- WORK EXPERIENCE ---
+\section{Expérience professionnelle}
+
+\textbf{Illuin Technology} \hfill Paris, France\\
+\textit{Ingénieur IA} \hfill \small Avril 2026 -- Aujourd'hui
+\begin{itemize}
+    \item Développement et amélioration d'agents conversationnels avec ILLUIN Dialogue pour les parcours de souscription de forfaits mobiles et de gestion de compte d'Orange.
+    \item Conception de 5 agents spécialisés mobilisant prompt engineering, tool calling, RAG, tests automatisés et optimisation des parcours conversationnels.
+    \item Travail au sein d'une équipe Illuin de 20 personnes, en lien étroit avec les équipes d'Orange, pour garantir la fiabilité des réponses et des actions des agents.
+\end{itemize}
+
+\textbf{IFP Energies Nouvelles} \hfill Lyon, France\\
+\textit{Stagiaire Data Scientist} \hfill \small Avril 2025 -- Septembre 2025
+\begin{itemize}
+    \item Classification industrielle de pneus par scan spectral pour le recyclage : maîtrise de la technologie de scan NIR, protocole expérimental, acquisition des données et conception du pipeline ML (PLS-DA + SVM).
+    \item Mise en œuvre de l'algorithme des projections successives (SPA) pour la sélection de variables : temps d'acquisition divisé par 10 avec 100\% de précision conservée.
+    \item Poster présenté au Congrès national de chimiométrie (GFC-NCA 2026, février 2026).
+\end{itemize}
+
+\textbf{Société du Canal de Provence} \hfill Aix-en-Provence, France\\
+\textit{Stagiaire / Prestataire analyste données climatiques} \hfill \small Septembre 2023 -- Mars 2024
+\begin{itemize}
+    \item Développement de pipelines d'analyse climatique : intégration de jeux de données hydro-climatiques mondiaux (WorldClim, DRIAS, Explore2) et de projections du changement climatique à l'horizon 2050 (scénarios SSP/RCP).
+    \item Réalisation d'études prédictives internationales sur la dynamique des nappes phréatiques à Madagascar, les risques de sécheresse au Panama et l'hydroélectricité en Bosnie (capacité projetée -20\% d'ici 2050). Collaboration avec Ernst \& Young. Stage prolongé de 3 mois.
+\end{itemize}
+
+% --- EDUCATION ---
+\section{Formation}
+
+\textbf{Centrale Lyon} \hfill Septembre 2021 -- Septembre 2025\\
+\textit{Diplôme d'ingénieur généraliste (Master)} \hfill Lyon, France\\[2pt]
+\textbf{Keio University} \hfill Avril 2023 -- Août 2023\\
+\textit{Échange académique en intelligence artificielle} -- spécialisation Data Science \hfill Tokyo, Japon\\
+\small Échange académique centré sur des cours d'IA et de vision par ordinateur.
+
+\vspace{2pt}
+\noindent\textbf{Certifications :} Dataiku Core Designer (2025) \quad$\cdot$\quad Stanford Deep Learning (Andrew Ng) \quad$\cdot$\quad Inria Machine Learning with scikit-learn
+
+% --- HACKATHONS & COMPETITIONS ---
+\section{Hackathons \& Compétitions}
+
+\textbf{GE Healthcare - Mistral AI - Hackathon AI for Health} \hfill \textbf{3\textsuperscript{e} / 22 équipes (prix de 1\,750 €)}
+\begin{itemize}
+    \item Segmentation par vision par ordinateur de scanners CT 3D : extraction automatique de la coupe montrant le diamètre maximal de la tumeur (2\,000 vues).
+    \item Classification Lung-RADS / RECIST et génération automatique de comptes rendus via Mistral AI, validées par un radiologue.
+    \item Temps d'analyse divisé par 10 (20 min $\rightarrow$ 2 min, réf. IGAS) pour un coût de 0,01 €/compte rendu sur données réelles.
+\end{itemize}
+
+\textbf{CSIRO Image2biomass} (cagnotte de 75\,k\$) \hfill \textbf{Top 10\%}
+\begin{itemize}
+    \item Compétition de vision par ordinateur : prédiction de la biomasse agricole à partir d'images de terrain.
+    \item Combinaison Vision Transformer (DINOv2) + MLP pour atteindre $R^2 = 0.70$.
+\end{itemize}
+
+% --- VOLUNTEERING & LEADERSHIP ---
+\section{Engagement associatif \& Leadership}
+
+\textbf{Adopt AI Forum} \hfill Novembre 2025\\
+\textit{Forum mondial sur l'adoption de l'IA dans les industries (600 PDG, keynote du Président de la République)}
+\begin{itemize}
+    \item Responsable des espaces privés : coordination de la logistique et interlocuteur principal des partenaires entreprises (BNP Paribas, Nvidia, Meta, Servier).
+\end{itemize}
+
+\textbf{Solidari'terre} \hfill 2022 -- 2023\\
+\textit{Chef de projet -- Maraudes de nuit (association humanitaire de Centrale Lyon, 17 membres)}
+\begin{itemize}
+    \item Coordination de 5 bénévoles par session, gestion des stocks et de la logistique pour 30 distributions de repas par semaine.
+\end{itemize}
+
+\end{document}
+

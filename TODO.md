@@ -22,6 +22,21 @@ Chaque MVP est utilisable seul. On ne passe au suivant que si le précédent tou
 - [ ] Plafond `max_results` : répartir par site (avec `disable_filters`, les derniers sites sont coupés)
 - [ ] Remettre `disable_filters: false` (criteria.yaml) et relever `max_results_per_site`
 
+## Remplissage de formulaires (Chrome / Edge)
+- [x] Extension + programme local : Ctrl+Alt+Espace, profil perso `input/form_profile.yaml` (hors git), démarrage automatique (`.\fill.ps1 install`)
+- [x] Étapes multiples (un seul Ctrl+Alt+Espace, arrêt avant l envoi)
+- [ ] Cases à cocher, upload de fichiers (volontairement manuel)
+- [ ] Extension : icône + état (programme local arrêté), packaging pour éviter l'avertissement « mode développeur »
+- [x] Tournée de connexion (`.\login.ps1`) : sites dans `input/login_sites.yaml`, état dans `output/logins.json`
+- [ ] Commande « ouvrir l'offre dans ton Chrome connecté » (étape 2 : le seul geste humain devient l'upload, le captcha éventuel et l'envoi)
+- [ ] Vision « mode comptes guidé » : une commande qui ouvre un à un les sites où il faut un compte, préremplit l'e-mail et les champs non secrets, laisse le gestionnaire de mots de passe générer et enregistrer le mot de passe (l'utilisateur ne le voit ni ne le tape), attend un raccourci « fait » et passe au site suivant ; l'IA n'y touche jamais aux identifiants. Pas de création de comptes 100 % automatique : e-mail de vérification, captchas et conditions d'utilisation des sites l'empêchent.
+- [ ] `apply.ps1` (Ctrl+Alt+F, Playwright) et l'extension dupliquent la lecture des champs (`src/formfill.py` / `extension/content.js`) : n'en garder qu'une
+
+## International / langues
+- [x] Détection fr/en de l'offre (comptage de mots-outils) -> CV et LM dans la langue de l'offre
+- [ ] Lieux étrangers à autoriser (`criteria.yaml`), localisation trop longue dans le header du CV (ex. « PARIS OFFICE or REMOTE FROM FRANCE »)
+- [ ] Offres sans description : classer aussi sur le lieu / la source
+
 ## MVP3 — Data visualisation
 - [ ] Géocodage des localisations d'offres (ville/région → coordonnées)
 - [ ] Carte de France interactive des offres de la semaine (nouvelles offres par région/métier)

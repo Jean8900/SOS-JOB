@@ -1,0 +1,33 @@
+# Tournée de connexion (.\login.ps1) : les sites où tu veux rester connecté pour candidater.
+# La commande les ouvre un à un dans ton Chrome ; tu te connectes toi-même (le gestionnaire de mots
+# de passe de Chrome ou Bitwarden remplit et enregistre) ; la session dure ensuite des semaines.
+# Aucun identifiant ne passe par ce code. Adapte la liste : ajoute un site, mets enabled: false.
+
+# Profil Chrome à utiliser (dossier « Default », « Profile 1 »... visible sur chrome://version).
+# Vide = le dernier profil utilisé.
+profile_directory: ""
+
+# Arguments Chrome supplémentaires (rarement utile).
+chrome_args: []
+
+sites:
+  - name: Welcome to the Jungle
+    url: https://www.welcometothejungle.com/fr/authenticate/signin
+  - name: Workday - Deloitte
+    url: https://fina.wd103.myworkdayjobs.com/fr-FR/DeloitteRecrute
+  - name: LinkedIn
+    url: https://www.linkedin.com/login
+  - name: Free-Work
+    url: https://www.free-work.com/fr
+  - name: Apec
+    url: https://www.apec.fr/candidat.html
+  - name: HelloWork
+    url: https://www.hellowork.com/fr-fr/
+  - name: Cadremploi
+    url: https://www.cadremploi.fr/
+  - name: ChooseYourBoss
+    url: https://www.chooseyourboss.com/
+  - name: talent.io
+    url: https://www.talentio.app/
+  - name: Station F Jobs
+    url: https://jobs.stationf.co/

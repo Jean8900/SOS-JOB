@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import config, cv_builder
+from . import config, cv_builder, language
 from .offer import Offer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -56,15 +56,26 @@ def _latex_to_text(tex: str) -> str:
     return tex.strip()
 
 
-def extract_cv_facts(reference_text: str | None = None) -> str:
-    """Extrait les faits vérifiables du CV (puces + stack technique), nettoyés."""
-    reference_text = reference_text if reference_text is not None else REFERENCE_TEX.read_text(encoding="utf-8")
+def extract_cv_facts(reference_text: str | None = None, lang: str = "en") -> str:
+    """Extrait les faits vérifiables du CV de la langue demandée (puces + stack technique), nettoyés."""
+    if reference_text is None:
+        reference_text = cv_builder.reference_path(lang).read_text(encoding="utf-8")
     items = re.findall(r"\\item\s+(.*?)(?=\\item|\\end\{itemize\})", reference_text, re.DOTALL)
     facts = [_latex_to_text(item) for item in items]
     stack_match = re.search(r"\\textbf\{Tech Stack:\}(.*?)\\\\", reference_text)
     if stack_match:
         facts.insert(0, "Tech Stack: " + _latex_to_text(stack_match.group(1)))
     return "\n".join(f"- {fact}" for fact in facts if fact)
+
+
+def cv_profile_text(lang: str = "en") -> str:
+    """CV complet en texte brut, liens conservés (« LinkedIn (https://...) ») : pour remplir des formulaires
+    (liens, poste actuel, formation), là où extract_cv_facts ne garde que les puces de réalisations."""
+    tex = cv_builder.reference_path(lang).read_text(encoding="utf-8")
+    body = tex[tex.index(r"\begin{document}"):]
+    body = re.sub(r"\\href\{([^}]*)\}\{([^}]*)\}", r"\2 (\1)", body)
+    return re.sub(r"\n{3,}", "\n\n", _latex_to_text(body))
+
 
 
 def _job_description_text(offer: Offer) -> str:
@@ -83,11 +94,12 @@ _ATOUTS_MARKER = "###ATOUTS###"
 _ENTREPRISE_MARKER = "###ENTREPRISE###"
 
 
-def generate_blanks(offer: Offer, cv_facts: str) -> dict:
+def generate_blanks(offer: Offer, cv_facts: str, lang: str = "fr") -> dict:
     """Appelle `claude -p` (abonnement Pro, aucune clé API) pour remplir les
     2 blancs de la LM. Sortie texte avec délimiteurs explicites -- plus fiable
     sur un prompt long que --json-schema (qui peut être ignoré par le modèle)."""
-    prompt = f"""Tu rédiges 2 paragraphes courts d'une lettre de motivation, à partir UNIQUEMENT des faits vérifiés ci-dessous. N'invente RIEN : aucun fait, aucun chiffre, aucune techno qui n'y figure pas.
+    langue = "en français" if lang == "fr" else "EN ANGLAIS (les faits ci-dessous peuvent être en français : traduis-les fidèlement)"
+    prompt = f"""Tu rédiges 2 paragraphes courts d'une lettre de motivation, rédigés {langue}, à partir UNIQUEMENT des faits vérifiés ci-dessous. N'invente RIEN : aucun fait, aucun chiffre, aucune techno qui n'y figure pas.
 
 OFFRE :
 Poste : {offer.title}
@@ -145,18 +157,18 @@ _LM_TEMPLATE = r"""\documentclass[11pt, a4paper]{{article}}
 \end{{flushright}}
 
 \vspace{{0.5cm}}
-\textbf{{Objet : Candidature au poste de {job_title}}}
+\textbf{{{subject}}}
 
 \vspace{{0.5cm}}
-Madame, Monsieur,
+{salutation}
 
-Suite à votre offre de {job_title} chez {company_name}, je me permets de vous adresser ma candidature.
+{intro}
 
 {atouts}
 
 {entreprise}
 
-Je me tiens à votre disposition pour échanger plus en détail sur ma candidature lors d'un entretien. Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.
+{closing}
 
 \vspace{{1cm}}
 {signature_block}
@@ -165,7 +177,26 @@ Je me tiens à votre disposition pour échanger plus en détail sur ma candidatu
 """
 
 
-def render_lm_tex(offer: Offer, blanks: dict) -> str:
+# Parties fixes de la LM selon la langue ({job} et {company} sont échappés LaTeX avant insertion).
+_LM_TEXTS = {
+    "fr": {
+        "subject": "Objet : Candidature au poste de {job}",
+        "salutation": "Madame, Monsieur,",
+        "intro": "Suite à votre offre de {job} chez {company}, je me permets de vous adresser ma candidature.",
+        "closing": "Je me tiens à votre disposition pour échanger plus en détail sur ma candidature lors d'un entretien. "
+                   "Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.",
+    },
+    "en": {
+        "subject": "Subject: Application for the position of {job}",
+        "salutation": "Dear Hiring Manager,",
+        "intro": "Following your job posting for {job} at {company}, I am pleased to submit my application.",
+        "closing": "I would welcome the opportunity to discuss my application with you in an interview. "
+                   "Thank you for your time and consideration, and I look forward to hearing from you.\n\nYours sincerely,",
+    },
+}
+
+
+def render_lm_tex(offer: Offer, blanks: dict, lang: str = "fr") -> str:
     identity = config.load_cv_template()
     name = identity["candidate_name"]
     contact = f"{identity['candidate_location']} · {identity['candidate_phone']} · {identity['candidate_email']}"
@@ -177,11 +208,13 @@ def render_lm_tex(offer: Offer, blanks: dict) -> str:
     else:
         signature_block = cv_builder.escape_latex(name)
 
+    texts = {k: v.format(job=cv_builder.escape_latex(job_title), company=cv_builder.escape_latex(company_name))
+             for k, v in _LM_TEXTS[lang].items()}
     return _LM_TEMPLATE.format(
         candidate_name=cv_builder.escape_latex(name),
         candidate_contact=cv_builder.escape_latex(contact),
         company_name=cv_builder.escape_latex(company_name),
-        job_title=cv_builder.escape_latex(job_title),
+        **texts,
         atouts=cv_builder.escape_latex(blanks["atouts"]),
         entreprise=cv_builder.escape_latex(blanks["entreprise"]),
         signature_block=signature_block,
@@ -197,6 +230,25 @@ def is_archived(offer: Offer) -> bool:
     return (archive_pdf_dir_for_source(offer.source) / f"{basename}.pdf").exists()
 
 
+def lm_text(offer: Offer) -> str | None:
+    """LM en texte brut (de « Madame, Monsieur, » à la formule de politesse, sans signature),
+    relue depuis le .tex pour couvrir aussi les LM déjà générées ou archivées."""
+    name = f"{basename_for_job(offer)}.tex"
+    tex_path = next((p for p in (tex_dir_for_source(offer.source) / name,
+                                 ARCHIVE_TEX_ROOT / offer.source / name) if p.exists()), None)
+    if tex_path is None:
+        return None
+    parts = tex_path.read_text(encoding="utf-8").split(r"\vspace{0.5cm}")
+    if len(parts) < 3:
+        return None
+    body = parts[2].split(r"\vspace{1cm}")[0]
+    # Inverse de cv_builder.escape_latex (séquences longues d'abord, puis les caractères simples).
+    inverse = {v: k for k, v in cv_builder._LATEX_SPECIAL_CHARS.items()}
+    body = re.sub("|".join(re.escape(s) for s in sorted(inverse, key=len, reverse=True)),
+                  lambda m: inverse[m.group(0)], body)
+    return re.sub(r"\n{3,}", "\n\n", body).strip() + "\n"
+
+
 def generate_lm_for_job(offer: Offer) -> Path:
     tex_dir = tex_dir_for_source(offer.source)
     pdf_dir = pdf_dir_for_source(offer.source)
@@ -204,9 +256,10 @@ def generate_lm_for_job(offer: Offer) -> Path:
     pdf_dir.mkdir(parents=True, exist_ok=True)
     basename = basename_for_job(offer)
 
-    cv_facts = extract_cv_facts()
-    blanks = generate_blanks(offer, cv_facts)
-    tex_content = render_lm_tex(offer, blanks)
+    lang = language.detect(offer)
+    cv_facts = extract_cv_facts(lang=lang)
+    blanks = generate_blanks(offer, cv_facts, lang)
+    tex_content = render_lm_tex(offer, blanks, lang)
 
     tex_path = tex_dir / f"{basename}.tex"
     tex_path.write_text(tex_content, encoding="utf-8")

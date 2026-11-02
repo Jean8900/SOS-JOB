@@ -15,3 +15,6 @@
   régénérables à tout moment via `python run.py`).
 - Une entreprise qui échoue au scraping (`src/scraper.py`) ne doit jamais
   interrompre les autres : logguer l'erreur et continuer.
+- Extension de remplissage (`extension/`, `fill.py`, `src/formfill.py`) : ne jamais cliquer sur un
+  bouton d'envoi final ni saisir d'identifiant ; les infos perso vivent dans `input/form_profile.yaml`
+  (hors git) ; cas limites dans `extension/EDGE_CASES.md`, méthode dans `.claude/skills/form-fill-testing`.

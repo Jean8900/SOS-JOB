@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.sos-job/**)",
+      "Bash(cat ~/.sos-job/**)",
+      "Bash(type ~/.sos-job/**)"
+    ]
+  }
+}

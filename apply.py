@@ -7,6 +7,7 @@ toi-même ; rien n'est soumis automatiquement.
 Raccourcis globaux (marchent quelle que soit la fenêtre active) :
   Ctrl+Alt+Droite = candidaté   Ctrl+Alt+Gauche = offre précédente
   Ctrl+Alt+S = passer           Ctrl+Alt+Q = quitter
+  Ctrl+Alt+F = pré-remplir le formulaire de l'onglet actif (relecture puis envoi à ta main)
 Usage : python apply.py
 """
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src import applications, config, dashboard, winlayout  # noqa: E402
+from src import applications, config, dashboard, formfill, lm_builder, winlayout  # noqa: E402
 from src.hotkeys import HotkeyListener  # noqa: E402
 from src.offer import Offer  # noqa: E402
 
@@ -51,9 +52,19 @@ def apply_url(offer: Offer) -> str:
 
 
 def stage_files(offer: Offer, staging: Path, file_name: str) -> list[str]:
-    """Copie CV/LM de l'offre sous des noms fixes. Retourne les avertissements."""
+    """Copie CV/LM de l'offre sous des noms fixes (+ LM en texte brut). Retourne les avertissements."""
     cv, lm = applications.locate_pdfs(offer)
     warnings = []
+    txt_dest = staging / f"LM_{file_name}.txt"
+    text = lm_builder.lm_text(offer)
+    if text is None:
+        txt_dest.unlink(missing_ok=True)
+        warnings.append("LM texte introuvable pour cette offre")
+    else:
+        try:
+            txt_dest.write_text(text, encoding="utf-8")
+        except OSError as exc:
+            warnings.append(f"LM texte non écrite ({exc})")
     for label, src in (("CV", cv), ("LM", lm)):
         dest = staging / f"{label}_{file_name}.pdf"
         if src is None:
@@ -79,7 +90,8 @@ class Layout:
         self.dashboard = (x + left_w, y + top_h, w - left_w, h - top_h)
         self.chrome = _find_chrome()
         self.copilot_dir = copilot_dir
-        self._browser_opened = False
+        self.debug_port = int(cfg.get("debug_port", 9222))
+        self._browser_hwnd = 0
 
     def open_explorer(self, folder: Path) -> None:
         subprocess.Popen(["explorer.exe", str(folder)])
@@ -101,17 +113,21 @@ class Layout:
     def open_offer(self, url: str) -> None:
         if not url.startswith(("http://", "https://")):
             return
-        if not self._browser_opened:
+        if not (self._browser_hwnd and winlayout.is_window(self._browser_hwnd)):
             x, y, w, h = self.browser
-            subprocess.Popen([self.chrome, "--new-window", f"--window-position={x},{y}",
+            # Profil dédié + port de débogage : nécessaires au pré-remplissage (Chrome refuse le port sur le profil par défaut).
+            subprocess.Popen([self.chrome, f"--remote-debugging-port={self.debug_port}",
+                              f"--user-data-dir={self.copilot_dir / 'chrome_profile'}",
+                              "--no-first-run", "--no-default-browser-check",
+                              "--new-window", f"--window-position={x},{y}",
                               f"--window-size={w},{h}", url])
             time.sleep(2.0)
             hwnd = winlayout.foreground_window()
             if winlayout.window_class(hwnd) == "Chrome_WidgetWin_1":
                 winlayout.move_window(hwnd, *self.browser)
-            self._browser_opened = True
+                self._browser_hwnd = hwnd
         else:
-            subprocess.Popen([self.chrome, url])  # nouvel onglet dans la fenêtre Chrome existante
+            winlayout.navigate_active_tab(self._browser_hwnd, url)  # même onglet : pas d'onglets qui s'accumulent
 
 
 def compute_stats(session: list[tuple[str, Offer]], i: int, warnings: list[str]) -> dict:
@@ -164,6 +180,15 @@ def main() -> None:
             layout.open_offer(apply_url(offer))
             dashboard.write(page, dashboard.render(compute_stats(session, i, warnings + offer_warnings)))
             action = hotkeys.wait()
+            while action == "fill":
+                print("Pré-remplissage en cours...")
+                try:
+                    message = formfill.fill_active_page(offer, cfg)
+                except Exception as exc:  # une erreur de remplissage ne doit jamais arrêter le copilot
+                    message = f"Remplissage échoué : {exc}"
+                print(message)
+                dashboard.write(page, dashboard.render(compute_stats(session, i, warnings + offer_warnings + [message])))
+                action = hotkeys.wait()
             if action == "right":
                 applications.set_status(key, applications.APPLIED)
                 i += 1

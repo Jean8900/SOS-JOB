@@ -8,6 +8,13 @@
 subtitle_anchor: "AI Engineer -- Centrale Lyon Graduate"
 location_anchor: "Paris \\quad$\\cdot$\\quad"
 
+# Offre en français -> CV_originel_fr.tex (traduction de CV_originel.tex) : sa
+# ligne de sous-titre et la phrase d'objectif injectée dans le header. {title} et
+# {location} sont remplacés par ceux de l'offre.
+subtitle_anchor_fr: "Ingénieur IA -- Diplômé de Centrale Lyon"
+objective_en: "{title} -- Open to {location}"
+objective_fr: "{title} -- Disponible à {location}"
+
 # Identité du candidat, utilisée pour le header/signature des LM (src/lm_builder.py).
 # Saisie à la main plutôt que déduite du .tex -- plus simple et plus fiable
 # qu'un parseur LaTeX générique.

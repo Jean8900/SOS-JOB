@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "SOS-JOB Remplissage",
+  "version": "0.1.0",
+  "description": "Ctrl+Alt+Espace : pré-remplit le formulaire de l'onglet actif (réponses rédigées par le programme local SOS-JOB). N'envoie jamais rien.",
+  "permissions": ["scripting", "tabs", "alarms", "webNavigation", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" }
+}

@@ -1,0 +1,20 @@
+# Modèle de input/form_profile.yaml (copie ce fichier sous ce nom et remplis-le).
+# Le vrai fichier est ignoré par git : tes infos perso ne quittent pas ta machine.
+# Une valeur vide n'est jamais inventée : le champ du formulaire reste vide.
+
+address_street: ""
+postal_code: ""
+city: ""
+country: ""
+
+civility: ""            # Monsieur / Madame
+gender: ""
+pronouns: ""            # ex. He/Him, She/Her, They/Them
+nationality: ""
+
+work_authorization: ""  # droit de travail par pays, besoin de visa ou de parrainage
+
+salary_expectation: ""
+notice_period: ""
+availability: ""
+how_did_you_hear: ""

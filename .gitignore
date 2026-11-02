@@ -23,3 +23,5 @@ client_secret*.json
 output/ats_cache.json
 output/applications.json
 output/copilot/
+input/form_profile.yaml
+output/logins.json

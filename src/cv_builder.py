@@ -14,11 +14,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import config
+from . import config, language
 from .offer import Offer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCE_TEX = REPO_ROOT / "input" / "CV_originel.tex"
+REFERENCE_TEX_FR = REPO_ROOT / "input" / "CV_originel_fr.tex"
 OUTPUT_TEX_ROOT = REPO_ROOT / "output" / "CV" / "tex"
 OUTPUT_PDF_ROOT = REPO_ROOT / "output" / "CV" / "pdf"
 
@@ -46,9 +47,14 @@ def slugify(text: str) -> str:
     return text or "job"
 
 
-def render_header(reference_text: str, objective: str, location: str) -> str:
+def reference_path(lang: str) -> Path:
+    """CV source selon la langue de l'offre : anglais (CV_originel.tex) ou français (CV_originel_fr.tex)."""
+    return REFERENCE_TEX_FR if lang == "fr" else REFERENCE_TEX
+
+
+def render_header(reference_text: str, objective: str, location: str, lang: str = "en") -> str:
     anchors = config.load_cv_template()
-    subtitle_anchor = anchors["subtitle_anchor"]
+    subtitle_anchor = anchors["subtitle_anchor_fr"] if lang == "fr" else anchors["subtitle_anchor"]
     location_anchor = anchors["location_anchor"]
 
     header_start = reference_text.index("% --- HEADER ---")
@@ -75,10 +81,13 @@ def render_header(reference_text: str, objective: str, location: str) -> str:
 
 
 def build_tex_for_job(offer: Offer, reference_text: str | None = None) -> str:
-    reference_text = reference_text if reference_text is not None else REFERENCE_TEX.read_text(encoding="utf-8")
+    lang = language.detect(offer)
+    if reference_text is None:
+        reference_text = reference_path(lang).read_text(encoding="utf-8")
     location = offer.location or "France"
-    objective = f"{offer.title} -- Open to {location}"
-    return render_header(reference_text, objective, location)
+    template = config.load_cv_template()[f"objective_{lang}"]
+    objective = template.replace("{title}", offer.title).replace("{location}", location)
+    return render_header(reference_text, objective, location, lang)
 
 
 def _find_latexmk() -> str:
@@ -113,11 +122,22 @@ def compile_pdf(tex_path: Path, pdf_dir: Path) -> Path:
     pdf_path = pdf_dir / (tex_path.stem + ".pdf")
     pdf_path.unlink(missing_ok=True)
 
-    result = subprocess.run(
-        [latexmk, "-pdf", "-interaction=nonstopmode", "-halt-on-error",
-         f"-output-directory={pdf_dir}", str(tex_path)],
-        capture_output=True, text=True, timeout=120,
-    )
+    pdflatex = Path(latexmk).with_name("pdflatex.exe")
+    if shutil.which("perl") is None and pdflatex.exists():
+        # latexmk est un script perl : sans perl dans le PATH (cas d'un PowerShell sans Git\usr\bin),
+        # on appelle pdflatex directement, deux passes pour les références.
+        for _ in range(2):
+            result = subprocess.run(
+                [str(pdflatex), "-interaction=nonstopmode", "-halt-on-error",
+                 f"-output-directory={pdf_dir}", str(tex_path)],
+                capture_output=True, text=True, timeout=120,
+            )
+    else:
+        result = subprocess.run(
+            [latexmk, "-pdf", "-interaction=nonstopmode", "-halt-on-error",
+             f"-output-directory={pdf_dir}", str(tex_path)],
+            capture_output=True, text=True, timeout=120,
+        )
 
     if not pdf_path.exists():
         diagnostics = f"--- stdout ---\n{result.stdout[-2000:]}\n--- stderr ---\n{result.stderr[-1000:]}"

@@ -13,6 +13,8 @@ Customable script to help you to knowning the trend of job market and candidate 
 .\run.ps1 sites all force      # combinables, dans n'importe quel ordre
 .\apply.ps1                    # copilot de candidature (voir "Lot copilot")
 .\suivi.ps1                    # génère output/suivi.xlsx (une ligne par candidature). Tape une info dans « Mise à jour » : à la prochaine génération elle passe devant Notes ("update // historique"). Tes lignes ajoutées à la main sont conservées. Nécessite Excel/LibreOffice, ou import dans Google Sheets
+.\login.ps1                    # tournée de connexion : ouvre tes sites un à un, tu t'y connectes une fois (session gardée)
+.\fill.ps1 install             # lance le pré-remplissage de formulaires au démarrage de Windows (Ctrl+Alt+Espace dans Chrome / Edge, voir extension/README.md ; aussi `status`, `uninstall`)
 .\archive_lm.ps1                # déplace toutes les LM générées vers l'archive (écrase les doublons)
 ```
 Points d'entrée : [`list_companies.py`](list_companies.py), [`run.py`](run.py), [`archive_lm.py`](archive_lm.py).
@@ -46,6 +48,8 @@ Tout ce que tu peux régler toi-même vit dans [`input/`](input/README.md) :
 - Ton CV source → [`input/CV_originel.tex`](input/CV_originel.tex)
 - Ta signature pour les LM (facultatif) → [`input/LM/Signature.png`](input/LM/Signature.png)
 
+Langue : chaque offre est classée français / anglais par un simple comptage de mots-outils ([`src/language.py`](src/language.py), sans modèle). CV et LM sont générés dans la langue de l'offre (`CV_originel_fr.tex` pour le français, `CV_originel.tex` pour l'anglais ; textes fixes de la LM dans [`src/lm_builder.py`](src/lm_builder.py)). Limite : une offre sans description est classée sur son titre seul (français par défaut).
+
 Logique du filtre ([`src/matcher.py`](src/matcher.py)) :
 - **entre catégories** (lieu / contrat / métier / stack / séniorité) = **ET** strict
 - **dans une même catégorie** (ex: plusieurs métiers dans `professions:`) = **OU**
@@ -60,9 +64,28 @@ Logique du filtre ([`src/matcher.py`](src/matcher.py)) :
 
 ## Lot copilot
 
-Le goulot n'est plus la collecte ni la génération, mais le geste de candidature (ouvrir la bonne page, uploader CV et LM). `.\apply.ps1` parcourt les offres générées une à une : Chrome sur l'offre (moitié gauche), Explorateur sur le dossier d'upload (quart haut droit, `CV_` / `LM_<nom>.pdf` écrasés à chaque offre), tableau de bord HTML d'avancement (quart bas droit : %, reste, par site). Raccourcis globaux, quelle que soit la fenêtre active : `Ctrl+Alt+→` candidaté, `Ctrl+Alt+←` précédente, `Ctrl+Alt+S` passer, `Ctrl+Alt+Q` quitter. Statuts enregistrés dans `output/applications.json` (suivi, pas de doublon). Tu uploades toi-même : rien n'est soumis automatiquement. Réglages : [`input/copilot.yaml`](input/copilot.yaml).
+Le goulot n'est plus la collecte ni la génération, mais le geste de candidature (ouvrir la bonne page, uploader CV et LM). `.\apply.ps1` parcourt les offres générées une à une : Chrome sur l'offre (moitié gauche), Explorateur sur le dossier d'upload (quart haut droit, `CV_` / `LM_<nom>.pdf` écrasés à chaque offre), tableau de bord HTML d'avancement (quart bas droit : %, reste, par site). Raccourcis globaux, quelle que soit la fenêtre active : `Ctrl+Alt+→` candidaté, `Ctrl+Alt+←` précédente, `Ctrl+Alt+S` passer, `Ctrl+Alt+Q` quitter. Statuts enregistrés dans `output/applications.json` (suivi, pas de doublon). Le dossier contient 3 fichiers : `CV_` et `LM_<nom>.pdf` à uploader, et `LM_<nom>.txt` (lettre sans signature) à coller quand le formulaire demande un texte. Passer à l'offre suivante recharge l'onglet actif au lieu d'en ouvrir un nouveau. `Ctrl+Alt+F` pré-remplit les champs texte et listes du formulaire ouvert (profil Chrome dédié `output/copilot/chrome_profile`, réponses rédigées par Claude à partir du CV/LM et des faits de `form_facts`, champs surlignés en orange ; jamais d'envoi, ni cases à cocher, ni fichiers ; désactivé sur LinkedIn). Tu uploades toi-même : rien n'est soumis automatiquement. Réglages : [`input/copilot.yaml`](input/copilot.yaml).
 
 > **Temporaire** : `disable_filters: true` dans [`input/criteria.yaml`](input/criteria.yaml) désactive tout le filtrage (aucune offre des 7 sites du lot 1 ne passait le filtre strict avec 5 offres/site). À remettre à `false` une fois le copilot en place.
+
+## Tournée de connexion
+
+`.\login.ps1` ouvre un à un, dans ton Chrome, les sites de [`input/login_sites.yaml`](input/login_sites.yaml) (WTJ, Workday, LinkedIn, Free-Work, Apec...). Tu te connectes toi-même : le gestionnaire de mots de passe de Chrome (ou Bitwarden) remplit et enregistre, et Chrome garde la session des semaines, donc plus de reconnexion à chaque candidature. `Ctrl+Alt+→` = connecté (site suivant), `Ctrl+Alt+S` = passer, `Ctrl+Alt+←` = précédent, `Ctrl+Alt+Q` = quitter. Les sites connectés sont mémorisés (`output/logins.json`) et ne reviennent pas ; `--all` repasse sur tous, `--list` montre l'état. Le programme ne lit pas les pages, ne prend aucune capture et ne voit ni ne stocke aucun identifiant. Session expirée sur un site : relance la tournée avec `--all`.
+
+## Remplissage de formulaires partout (Chrome et Edge)
+
+`Ctrl+Alt+Espace`, dans Chrome ou Edge, pré-remplit les champs vides du formulaire de l'onglet actif : identité, adresse, liens, entreprise actuelle, questions ouvertes (réponses dans la langue des questions, longueurs min/max respectées), Oui/Non, listes. Rien n'est envoyé. Une extension ([`extension/`](extension/README.md), à charger une fois dans chaque navigateur) lit et remplit la page ; un programme local ([`fill.py`](fill.py), lancé par `.\fill.ps1 install`) porte le raccourci global et fait rédiger les réponses par Claude à partir du CV et de [`input/form_profile.yaml`](input/form_profile.example.yaml) (adresse, salaire, préavis : fichier local ignoré par git, jamais dans le CV ni la LM). Il n'écoute que sur 127.0.0.1 et refuse tout appel venant d'une page web. Désactivé sur LinkedIn (`fill_excluded_domains`).
+
+## Candidatures WTJ en lot
+
+Ce que ça fait aujourd'hui : cherche des offres WTJ à candidature intégrée (un métier, une offre par entreprise), génère CV + LM si absents, ouvre chaque offre dans ton Chrome (un onglet chacune), clique « Postuler », remplit le formulaire (champs, questions, LM, case de consentement), pose le CV, puis s'arrête juste avant « J'envoie ma candidature ! » : tu relis et tu envoies toi-même.
+
+```powershell
+.\batch.ps1 prepare "technicien de maintenance" -n 10   # offres + CV/LM (~8 min)
+.\batch.ps1 --lot -n 10                                 # ouvre, remplit, s'arrête avant l'envoi
+```
+
+Prérequis : `.\fill.ps1 install` et l'extension chargée dans Chrome (voir ci-dessus), session WTJ ouverte (`.\login.ps1`). Limite : seule une minorité d'offres WTJ a le formulaire intégré, les autres renvoient chez l'employeur. Cas limites : [`extension/EDGE_CASES.md`](extension/EDGE_CASES.md).
 
 ## Suivi des candidatures (début)
 

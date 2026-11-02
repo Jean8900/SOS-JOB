@@ -13,3 +13,18 @@ staging_dir: output/copilot/a_uploader
 # pour le navigateur, et part de la hauteur pour l'Explorateur.
 browser_width_ratio: 0.5
 explorer_height_ratio: 0.5
+
+# Pré-remplissage des formulaires (Ctrl+Alt+F). Chrome du copilot = profil dédié
+# (output/copilot/chrome_profile, connexions conservées) avec port de débogage.
+debug_port: 9222
+
+# Programme local du pré-remplissage (fill.py) : port d'écoute sur 127.0.0.1.
+# Doit rester identique à PORT dans extension/background.js.
+fill_server_port: 47321
+
+# Sites où le pré-remplissage est désactivé (conditions d'utilisation).
+fill_excluded_domains:
+  - linkedin.com
+
+# Tes infos perso pour les formulaires (adresse, salaire, préavis...) : input/form_profile.yaml
+# (local, ignoré par git, jamais dans le CV ni la LM). Modèle : input/form_profile.example.yaml.
