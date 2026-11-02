@@ -56,6 +56,7 @@
 
   // Champs vides et visibles de la page (texte, listes, radios, listes déroulantes à boutons).
   function extract(prefix) {
+    if (onApec()) apecClearDefaultMessage();
     const out = [];
     document.querySelectorAll('input, textarea, select').forEach((el, n) => {
       const type = (el.type || '').toLowerCase();
@@ -82,7 +83,7 @@
       el.setAttribute('data-sosjob', id);
       out.push({
         id, sel: selOf(el), kind: isSelect ? 'select' : (el.tagName === 'TEXTAREA' ? 'textarea' : 'input'), type,
-        label: labelOf(el), min_chars: el.minLength > 0 ? el.minLength : undefined,
+        label: el.getAttribute('data-sosjob-label') || labelOf(el), min_chars: el.minLength > 0 ? el.minLength : undefined,
         max_chars: el.maxLength > 0 ? el.maxLength : undefined,
         required: el.required || el.getAttribute('aria-required') === 'true',
         options: isSelect ? [...el.options].map((o) => o.text.trim()).filter(Boolean) : undefined,
@@ -94,7 +95,15 @@
       seen.add(el.name);
       const group = [...document.querySelectorAll('input[type=radio]')].filter((r) => r.name === el.name);
       if (group.some((r) => r.checked)) return;
-      const box = el.closest('fieldset, [role=radiogroup], [role=group]') || el.parentElement.parentElement;
+      let box = el.closest('fieldset, [role=radiogroup], [role=group]') || el.parentElement.parentElement;
+      // le texte de la question peut être un niveau plus haut (<div><p>Question *</p><div><label>OUI</label><label>NON</label></div></div>)
+      for (let up = 0; up < 3 && box.parentElement && !el.closest('fieldset, [role=radiogroup], [role=group]'); up++) {
+        const labels = group.map((r) => { const l = r.id && document.querySelector('label[for="' + CSS.escape(r.id) + '"]'); const w = r.closest('label'); return ((l && l.innerText) || (w && w.innerText) || r.value || '').replace(/\s+/g, ' ').trim(); });
+        let rest = (box.innerText || '').replace(/\s+/g, ' ').trim();
+        labels.forEach((o) => { if (o) rest = rest.replace(o, ''); });
+        if (rest.trim().length > 3) break;
+        box = box.parentElement;
+      }
       const rb = box.getBoundingClientRect();
       if (rb.width < 5 || rb.height < 5) return;
       const opts = group.map((r) => {
@@ -390,7 +399,7 @@
     const ctl = [...document.querySelectorAll('input:not([type=hidden]), select, textarea')].filter(visible)
       .map((e) => e.id || e.name || e.type).join(',');
     const h = [...document.querySelectorAll('h1,h2,[role=heading]')].filter(visible).map((e) => e.innerText.trim()).join('|').slice(0, 200);
-    return location.href + '#' + ctl + '#' + h;
+    return location.href + '#' + ctl + '#' + h + '#' + (document.documentElement.getAttribute('data-sosjob-ticks') || '');
   }
 
   // Écran de connexion : jamais rempli, l'utilisateur se connecte lui-même (gestionnaire de mots de passe).
@@ -400,6 +409,9 @@
   // Clique sur le bouton de passage autorisé ; jamais sur un bouton d'envoi.
   function clickNext() {
     if (clickEntry()) return 'Postuler (ouverture du formulaire)';  // WTJ : ouvre le formulaire, n'envoie rien
+    if (onApec()) return apecNext();  // Apec : son propre parcours, rien d'autre n'est cliqué
+    if (onHello()) return helloNext();  // HelloWork : son propre parcours
+    if (onFree()) return freeNext();  // Free-Work : son propre parcours
     for (const b of buttons()) {
       const t = btnText(b);
       if (!NEXT_OK.test(t) || SUBMIT_WORDS.test(t) || b.disabled || b.getAttribute('aria-disabled') === 'true') continue;
@@ -413,9 +425,17 @@
   // Champs « fichier » encore vides (souvent masqués derrière un faux bouton) : CV, lettre ou autre chose.
   const FILE_CV = /r[ée]sum[ée]|\bcv\b|curriculum/i, FILE_LM = /cover|lettre|motivation|\blm\b/i;
   function fileInputs() {
+    if (onFree()) freeLabelMessage();
+    if (onApec()) apecNoSave();
+    if (onHello()) helloOpenMessage();
+    if (onFree()) {
+      const F = freeFiles();
+      return [!F.cv && { id: 'free-cv', kind: 'cv', label: 'CV' }, !F.lm && { id: 'free-lm', kind: 'lm', label: 'LM' }].filter(Boolean);
+    }
     const out = [];
-    document.querySelectorAll('input[type=file]').forEach((el, n) => {
+    (onFree() ? deepAll('input[type=file]') : [...document.querySelectorAll('input[type=file]')]).forEach((el, n) => {
       if (el.disabled || (el.files && el.files.length)) return;
+      if (onApec() && !visible(el)) return;  // Apec : les champs fichier n'existent qu'une fois le mode « importer » choisi
       const own = [labelFromAncestors(el), el.name, el.id, el.getAttribute('data-qa')].join(' ');
       const kind = FILE_LM.test(own) ? 'lm' : (FILE_CV.test(own) || FILE_CV.test(labelOf(el))) ? 'cv' : 'other';
       el.setAttribute('data-sosjob-file', 'f' + n);
@@ -425,7 +445,8 @@
   }
   // Pose un fichier dans le champ comme si l'utilisateur l'avait choisi (le PDF vient du programme local, en base64).
   function attachFile(id, b64, name) {
-    const el = document.querySelector('[data-sosjob-file="' + id + '"]');
+    if (id === 'free-cv' || id === 'free-lm') { freeFiles()[id.slice(5)] = { b64, name }; return true; }
+    const el = (onFree() ? deepAll('input[type=file]') : [...document.querySelectorAll('input[type=file]')]).find((x) => x.getAttribute('data-sosjob-file') === id);
     if (!el) return false;
     const bin = atob(b64), bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -434,6 +455,8 @@
     el.files = dt.files;
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
+    if (onApec()) { setTimeout(apecNoSave, 700); setTimeout(apecNoSave, 2000); }  // la case « enregistrer » apparaît après l'import
+    if (onFree() && el.files.length === 1) document.documentElement.setAttribute('data-sosjob-attached', '1');
     return el.files.length === 1;
   }
 
@@ -464,5 +487,293 @@
     return true;
   }
 
-  window.__sosjob = { clickEntry, submitReady, setCoverLetter, extract, readOptions, fill, toast, pageContext, stepSig, needsLogin, isReview, clickNext, fileInputs, attachFile };
+  // Apec : parcours « Postuler » -> « Postuler » (bis) -> « Je préfère joindre uniquement un CV » -> import du CV -> LM.
+  // Jamais de clic sur « Envoyer ma candidature » (il envoie réellement) : on s'arrête avant. « Données complémentaires » : intouchée.
+  const onApec = () => /(^|\.)apec\.fr$/.test(location.hostname);
+  // Les CV adaptés ne doivent pas s'accumuler dans le compte Apec : on décoche « Enregistrer le CV dans mon compte » (coché par défaut), et de même pour la lettre.
+  function apecNoSave() {
+    for (const l of [...document.querySelectorAll('label')].filter((x) => /^enregistrer (le cv|la lettre de motivation) dans mon compte/i.test(clean(x.innerText)) && visible(x))) {
+      const c = l.querySelector('input') || l.control || (l.previousElementSibling && l.previousElementSibling.tagName === 'INPUT' ? l.previousElementSibling : null) || l.parentElement.querySelector('input');
+      if (c && c.type === 'checkbox' && c.checked) c.click();
+    }
+  }
+  // Apec pré-remplit « Bonjour, je me permets de vous solliciter... » : on l'efface pour le remplacer par un message personnalisé.
+  function apecClearDefaultMessage() {
+    for (const t of document.querySelectorAll('textarea')) {
+      if (!visible(t) || !/^\s*bonjour,?\s+je me permets de vous solliciter/i.test(t.value)) continue;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, '');
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+      t.setAttribute('data-sosjob-label', 'Ajouter un message au recruteur ? * (message court de 3 à 4 phrases, personnalisé pour cette offre à partir du CV et de la lettre de motivation ; pas de formule générique)');
+    }
+  }
+  function apecNext() {
+    const labelled = (re) => [...document.querySelectorAll('label')].find((l) => re.test(clean(l.innerText)) && visible(l));
+    // Angular : <div><input type=radio><label>texte</label></div> (pas de for=) : l'entrée est le frère qui précède le libellé
+    const inputOf = (l) => l && (l.querySelector('input') || l.control || (l.previousElementSibling && l.previousElementSibling.tagName === 'INPUT' ? l.previousElementSibling : null) || l.parentElement.querySelector('input'));
+    // 1. page de l'offre : lien « Postuler » interne à l'Apec (pas celui qui renvoie chez l'employeur)
+    if (/detail-offre/.test(location.pathname)) {
+      const a = [...document.querySelectorAll('a')].find((x) => /^postuler$/i.test(clean(x.innerText)) && /postuler-a-une-offre/.test(x.getAttribute('href') || '') && visible(x));
+      if (a) { a.click(); return 'Postuler (offre)'; }
+      return '';
+    }
+    // 2. « Vous êtes sur le point de postuler » : « Postuler » (bis), sans prendre l'échange avec un conseiller
+    if (/#\/candidature\/promotion\//.test(location.hash)) {
+      const b = [...document.querySelectorAll('button')].find((x) => /^postuler$/i.test(clean(x.innerText)) && visible(x) && !x.disabled);
+      if (b) { b.click(); return 'Postuler (bis)'; }
+      return '';
+    }
+    // 3. formulaire : CV seul, import d'un CV (sans l'enregistrer dans le compte), LM à joindre
+    if (/#\/candidature\/formulaire\//.test(location.hash)) {
+      for (const [re, name] of [[/^je préfère joindre uniquement un cv/i, 'CV seul'], [/^importer un cv/i, 'Importer un CV']]) {
+        const r = inputOf(labelled(re));
+        if (r && r.type === 'radio' && !r.checked) { r.click(); return name; }
+      }
+      const lm = inputOf(labelled(/^joindre ma lettre de motivation/i));
+      if (lm && lm.type === 'radio' && !lm.checked) { lm.click(); return 'Joindre la LM'; }
+      // Pas de LM demandée : bloc repliable « Ajouter un message au recruteur ? » à déplier (le champ texte est ensuite rempli)
+      const head = [...document.querySelectorAll('div, button, a, h2, h3, span')]
+        .filter((e) => visible(e) && /^ajouter un message au recruteur/i.test(clean(e.innerText)) && e.innerText.length < 60).pop();
+      if (head && !lm && ![...document.querySelectorAll('textarea')].some(visible) && !document.documentElement.hasAttribute('data-sosjob-msgopen')) {
+        document.documentElement.setAttribute('data-sosjob-msgopen', '1');
+        head.click();
+        return 'Message au recruteur (déplier)';
+      }
+    }
+    return '';
+  }
+
+  // HelloWork : lien « Postuler » (en-tête) -> formulaire sur la page (#postuler) -> CV importé -> message au recruteur.
+  // Jamais de clic sur le bouton noir « Postuler » du formulaire (data-cy=submitButton) : il envoie la candidature.
+  const onHello = () => /(^|\.)hellowork\.com$/.test(location.hostname);
+  // « Personnaliser mon message au recruteur » : case cachée (cover-letter-collapse-funnel) pilotée par son <label> ; dépliée pendant le remplissage
+  function helloOpenMessage() {
+    const toggle = document.getElementById('cover-letter-collapse-funnel');
+    if (toggle && toggle.type === 'checkbox' && !toggle.checked) {
+      const head = document.querySelector('label[for="cover-letter-collapse-funnel"]');
+      if (head) head.click();
+    }
+    // message prérempli par HelloWork (« Madame, Monsieur, Suite à votre offre… ») : on l'efface pour le remplacer par un message personnalisé
+    const t = document.querySelector('textarea[name="MotivationLetter"]');
+    if (t && /^\s*madame,? monsieur,?\s+suite à votre offre/i.test(t.value)) {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, '');
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+      t.setAttribute('data-sosjob-label', 'Message au recruteur * (message court de 3 à 5 phrases, quelques centaines de caractères, personnalisé pour cette offre à partir du CV et de la lettre de motivation ; pas de formule générique)');
+    }
+  }
+  function helloNext() {
+    if (!/\/emplois\/\d+/.test(location.pathname)) return '';
+    if (!location.hash.includes('postuler')) {
+      const a = document.querySelector('a[data-cy="applyButtonHeader"]');
+      if (a && visible(a)) { a.click(); return 'Postuler (ouvrir le formulaire)'; }
+      return '';
+    }
+    return '';
+  }
+
+  // Free-Work : message personnalisé + CV adapté joint comme « document additionnel » (le CV partagé du compte est le CVthèque public :
+  // on n'y touche pas). Jamais de clic sur « Je postule » (bouton submit du formulaire = envoi).
+  const onFree = () => /(^|\.)free-work\.com$/.test(location.hostname);
+  function deepAll(sel, root = document, out = []) {
+    root.querySelectorAll(sel).forEach((e) => out.push(e));
+    root.querySelectorAll('*').forEach((e) => { if (e.shadowRoot) deepAll(sel, e.shadowRoot, out); });
+    return out;
+  }
+  function freeLabelMessage() {
+    const t = document.querySelector('textarea[name="job-application-message"]');
+    if (t && !t.getAttribute('data-sosjob-label')) {
+      t.setAttribute('data-sosjob-label', 'Message au recruteur * (message court de 3 à 5 phrases, quelques centaines de caractères, personnalisé pour cette offre à partir du CV et de la lettre de motivation ; pas de formule générique)');
+    }
+  }
+  // Les PDF (CV, LM) arrivent par l'étape de remplissage : fileInputs() annonce deux champs fictifs (free-cv, free-lm), attachFile() les garde ici.
+  const tickFlow = () => { const r = document.documentElement; r.setAttribute('data-sosjob-ticks', String(Number(r.getAttribute('data-sosjob-ticks') || 0) + 1)); };
+  const freeFiles = () => (window.__sosjobFree = window.__sosjobFree || {});
+  // « Éditer » (CV partagé) RECHARGE la page avec ?resumeOnly=true et la fenêtre « Mes documents » ouverte : le parcours est donc en étapes,
+  // chacune relancée par l'étape de passage (les PDF sont re-fournis par fileInputs/attachFile après chaque rechargement).
+  //  a. page de l'offre : cliquer « Éditer »  ->  b. page rechargée : importer le CV, « Envoyer mon CV », menu ⋮, « Partager le CV »
+  //  c. « Document additionnel » -> « Ajouter » -> onglet « Ajouter un document » -> importer la LM -> « Envoyer le document » -> « Joindre le document »
+  const freeHelpers = () => {
+    const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+    const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); for (;;) { const v = fn(); if (v) return v; if (Date.now() - t0 > ms) return null; await sleepMs(300); } };
+    const btn = (re) => [...document.querySelectorAll('button')].find((b) => re.test(clean(b.innerText)) && visible(b) && !b.disabled);
+    const putFile = (input, f) => {
+      const bin = atob(f.b64), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], f.name, { type: 'application/pdf' }));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const shownInput = () => deepAll('input[type=file]').filter((i) => { const h = i.getRootNode().host; return h && visible(h); }).pop() || deepAll('input[type=file]').pop();
+    const modalOpen = () => [...document.querySelectorAll('div,h2,h3,span')].some((e) => e.children.length === 0 && visible(e) && /^(mes documents|my documents)$/i.test(clean(e.textContent)));
+    const note = (m) => {
+      let o = document.getElementById('sosjob-dbg');
+      if (!o) { o = document.createElement('div'); o.id = 'sosjob-dbg'; o.style.cssText = 'position:fixed;left:8px;top:140px;z-index:2147483647;background:#111;color:#fff;font:14px monospace;padding:6px 10px;border-radius:6px;max-width:90vw'; document.body.appendChild(o); }
+      o.textContent = 'SOS-JOB ' + m;
+      return m;
+    };
+    return { sleepMs, waitFor, btn, putFile, shownInput, modalOpen, note };
+  };
+  // Temps 1 : importer le CV et « Envoyer mon CV » (le site recharge ensuite la page). L'état vit dans sessionStorage (propre à l'onglet).
+  async function freeCvSubmit() {
+    const { sleepMs, waitFor, btn, putFile, shownInput, modalOpen, note } = freeHelpers(), F = freeFiles();
+    if (!(await waitFor(() => modalOpen()))) return note('CV : fenêtre « Mes documents » non ouverte');
+    const input = await waitFor(() => shownInput());
+    if (!input) return note('CV : champ fichier introuvable');
+    putFile(input, F.cv); note('CV importé'); await sleepMs(1200);
+    const send = await waitFor(() => btn(/^(envoyer mon cv|(send|submit|upload) my cv)$/i));
+    if (!send) return note('CV : bouton « Envoyer mon CV » introuvable');
+    sessionStorage.setItem('sosjob-cv-count', String(document.querySelectorAll('figcaption').length));
+    sessionStorage.setItem('sosjob-cv-stage', 'submitted');
+    send.click(); note('CV envoyé');
+    await sleepMs(3500);  // si la page ne se recharge pas, on enchaîne ; sinon l'étape suivante reprend sur la page rechargée
+    return await freeCvPick();
+  }
+  // Temps 2 (page rechargée, fenêtre ouverte) : le CV importé est le dernier de la liste ; menu ⋮ -> « Partager le CV » (= Make Default CV).
+  async function freeCvPick() {
+    const { sleepMs, waitFor, btn, modalOpen, note } = freeHelpers();
+    if (!(await waitFor(() => modalOpen()))) return note('CV : fenêtre non rouverte');
+    const before = Number(sessionStorage.getItem('sosjob-cv-count') || 0);
+    const caps = await waitFor(() => { const c = [...document.querySelectorAll('figcaption')]; return c.length > before ? c : null; }, 8000);
+    if (!caps) return note('CV : le CV envoyé n\'apparaît pas (' + document.querySelectorAll('figcaption').length + ' fichiers, avant ' + before + ')');
+    let card = caps[caps.length - 1]; while (card && !card.querySelector('button')) card = card.parentElement;
+    const dots = card.querySelector('button');
+    dots.click(); note('menu ⋮'); await sleepMs(900);
+    const dr = dots.getBoundingClientRect(), dx = dr.left + dr.width / 2, dy = dr.top + dr.height / 2;
+    const dist = (e) => { const r = e.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - dx) + Math.abs(r.top + r.height / 2 - dy); };
+    // l'entrée du menu ouvert par ⋮ (et non le bouton « Make Default CV » du bas de la fenêtre, qui vise le CV déjà sélectionné)
+    const item = await waitFor(() => [...document.querySelectorAll('button[role=menuitem], [role=menuitem]')]
+      .filter((e) => e.children.length <= 2 && visible(e) && /^(partager le cv|make default cv|share (the )?cv|set as default cv)$/i.test(clean(e.textContent)))
+      .sort((x, y) => dist(x) - dist(y))[0]);
+    if (!item) return note('CV : entrée « Partager le CV » introuvable');
+    sessionStorage.setItem('sosjob-cv-stage', 'done');
+    item.click(); note('CV par défaut changé'); tickFlow();
+    return 'CV : défini par défaut';
+  }
+  async function freeLmFlow() {
+    const { sleepMs, waitFor, btn, putFile, shownInput, modalOpen, note } = freeHelpers(), F = freeFiles();
+    if (!modalOpen()) {
+      const add = await waitFor(() => btn(/^(ajouter|add)$/i));
+      if (!add) return note('LM : bouton « Ajouter » introuvable');
+      add.scrollIntoView({ block: 'center' }); add.click(); note('document additionnel');
+    }
+    if (!(await waitFor(() => modalOpen()))) return note('LM : fenêtre non ouverte');
+    const tab = await waitFor(() => btn(/^(ajouter un document|add a document)$/i));
+    if (tab) { tab.click(); await sleepMs(900); }
+    const input = await waitFor(() => shownInput());
+    if (!input) return note('LM : champ fichier introuvable');
+    putFile(input, F.lm); note('LM importée'); await sleepMs(800);
+    const send = await waitFor(() => btn(/^(envoyer le document|(send|submit|upload) (the )?document)$/i));
+    if (!send) return note('LM : bouton « Envoyer le document » introuvable');
+    send.click(); note('LM envoyée'); await sleepMs(2500);
+    // la LM envoyée apparaît comme une carte : la sélectionner, puis « Joindre le document » (inactif tant que rien n'est sélectionné)
+    const prefix = F.lm.name.toLowerCase().slice(0, 12);
+    const cap = await waitFor(() => [...document.querySelectorAll('figcaption')].filter((f) => f.textContent.trim().toLowerCase().startsWith(prefix)).pop(), 8000);
+    if (cap) { (cap.closest('figure') || cap.parentElement).click(); note('LM sélectionnée'); await sleepMs(700); }
+    const join = await waitFor(() => btn(/^(joindre le document|join (the )?document)$/i), 6000);
+    if (join) { join.click(); note('LM jointe'); await sleepMs(1500); }
+    tickFlow();
+    return 'LM : ' + (join ? 'jointe' : 'envoyée');
+  }
+  function freeNext() {
+    if (!/\/job-mission\//.test(location.pathname)) return '';
+    const root = document.documentElement, F = freeFiles();
+    const resumePage = () => /resumeOnly=true/.test(location.search);
+    const stage = sessionStorage.getItem('sosjob-cv-stage') || '';
+    const runCv = () => { root.setAttribute('data-sosjob-cv-started', '1'); return (sessionStorage.getItem('sosjob-cv-stage') === 'submitted' ? freeCvPick() : freeCvSubmit()).catch((e) => String(e).slice(0, 80)); };
+    if (F.cv && stage !== 'done') {
+      if (resumePage()) return root.hasAttribute('data-sosjob-cv-started') ? '' : runCv();
+      const clickedAt = Number(sessionStorage.getItem('sosjob-edit-ts') || 0);
+      if (Date.now() - clickedAt < 20000) {  // « Éditer » vient d'être cliqué : attendre le chargement de la fenêtre, ne pas recliquer
+        return freeHelpers().waitFor(() => resumePage(), 12000).then((ok) => (ok && !root.hasAttribute('data-sosjob-cv-started') ? runCv() : ''));
+      }
+      return (async () => {  // la page se charge lentement et ignore un clic trop précoce (avant « hydratation ») : attendre, cliquer, réessayer
+        const H = freeHelpers();
+        const getEdit = () => [...document.querySelectorAll('button')].find((b) => (b.name || b.id) === 'default-resume-edit');
+        if (!(await H.waitFor(getEdit, 12000))) return '';
+        await H.sleepMs(2500);
+        const edit = getEdit();
+        if (!edit) return '';
+        sessionStorage.setItem('sosjob-edit-ts', String(Date.now()));
+        edit.scrollIntoView({ block: 'center' }); edit.click();
+        return 'Éditer le CV partagé';  // la page se recharge : rendre la main tout de suite (attendre ici ferait échouer l'appel)
+      })();
+    }
+    if (F.lm && !root.hasAttribute('data-sosjob-lm-started')) { root.setAttribute('data-sosjob-lm-started', '1'); return freeLmFlow().catch((e) => String(e).slice(0, 80)); }
+    return '';
+  }
+
+  // ---- Retour structuré : état final vérifié par critère, instantané en cas d'échec, défilement vers la zone utile.
+  // Jamais de valeur perso : seulement des noms de fichiers, des longueurs, des booléens. Rien si un champ mot de passe est visible.
+  const pwVisible = () => [...document.querySelectorAll('input[type=password]')].some(visible);
+  const lenOf = (el) => (el && typeof el.value === 'string' ? el.value.length : 0);
+  const pdfNames = () => [...document.querySelectorAll('span, a, div, figcaption, p, label')]
+    .filter((e) => e.children.length === 0 && visible(e) && /\.pdf\s*$/i.test((e.textContent || '').trim()))
+    .map((e) => e.textContent.trim().slice(0, 50));
+  function siteState(exp) {
+    exp = exp || {};
+    if (pwVisible()) return { site: location.hostname, skipped: 'mot de passe visible' };
+    const c = [];
+    const add = (k, ok, v) => c.push({ k, ok: !!ok, v: v === undefined ? '' : String(v).slice(0, 60) });
+    const names = pdfNames();
+    const btnOk = (re) => { const b = [...document.querySelectorAll('button')].find((x) => re.test(clean(x.innerText))); return !!(b && visible(b) && !b.disabled); };
+    if (onWtj()) {
+      const ta = document.querySelector('[role=dialog] textarea[name="cover_letter"]');
+      add('message_lettre', lenOf(ta) > 80, lenOf(ta));
+      add('envoi_visible', submitReady());
+    } else if (onApec()) {
+      add('cv_adapte', exp.cv && names.includes(exp.cv), names.join(', '));
+      const ta = [...document.querySelectorAll('textarea')].find(visible);
+      add('lm_jointe_ou_message', names.length > 1 || !!ta);
+      if (ta) add('message_perso', lenOf(ta) > 80 && !/^\s*bonjour,?\s+je me permets de vous solliciter/i.test(ta.value), lenOf(ta));
+      add('envoi_actif', btnOk(/^envoyer ma candidature$/i));
+    } else if (onHello()) {
+      add('cv_adapte', exp.cv && names.includes(exp.cv), names.join(', '));
+      const ta = document.querySelector('textarea[name="MotivationLetter"]');
+      add('message_perso', ta && lenOf(ta) > 80 && !/^\s*madame,? monsieur,?\s+suite à votre offre/i.test(ta.value), lenOf(ta));
+      const send = document.querySelector('[data-cy="submitButton"]');
+      add('envoi_actif', send && visible(send) && !send.disabled);
+    } else if (onFree()) {
+      // offre qui renvoie chez l'employeur : pas de formulaire, « Apply to this job » est un lien -> écartée (pas un échec)
+      if (!document.querySelector('textarea[name="job-application-message"]') && [...document.querySelectorAll('a')].some((a) => /^(apply to this job|je postule|postuler)$/i.test(clean(a.innerText)) && visible(a))) {
+        c.push({ k: 'hors_site', ok: true, skip: true, v: 'candidature chez l’employeur' });
+        return { site: location.hostname, criteria: c };
+      }
+      const rowPdf = (re) => { const l = [...document.querySelectorAll('div, span')].find((e) => e.children.length === 0 && visible(e) && re.test(clean(e.textContent))); const row = l && (l.parentElement && l.parentElement.parentElement); return row ? [...row.querySelectorAll('span, a, div')].filter((e) => e.children.length === 0 && /\.pdf\s*$/i.test((e.textContent || '').trim())).map((e) => e.textContent.trim()) : []; };
+      const def = rowPdf(/^(default cv|cv partagé)$/i), extra = rowPdf(/^(additional document|document additionnel)$/i);
+      add('cv_adapte', exp.cv && def.includes(exp.cv), 'défaut : ' + def.join(', '));
+      add('lm_jointe', exp.lm && extra.includes(exp.lm), 'additionnel : ' + extra.join(', '));
+      { const n = Number(sessionStorage.getItem('sosjob-cv-count') || 0); if (n) add('cv_dans_compte', n <= 6, n + ' CV déjà dans le compte avant ce passage (à nettoyer à la main si trop)'); }
+      const ta = document.querySelector('textarea[name="job-application-message"]');
+      add('message_perso', ta && lenOf(ta) > 80, lenOf(ta));
+      add('envoi_actif', btnOk(/^(je postule|apply to this job)$/i));
+    }
+    // questions à choix (radios) : toutes répondues ?
+    { const radios = [...document.querySelectorAll('input[type=radio]')].filter((r) => r.name && (visible(r) || visible(r.parentElement)));
+      const names = [...new Set(radios.map((r) => r.name))];
+      const open = names.filter((n) => !radios.some((r) => r.name === n && r.checked));
+      if (names.length) add('questions_a_choix', open.length === 0, (names.length - open.length) + '/' + names.length + ' répondues'); }
+    return { site: location.hostname, criteria: c };
+  }
+  function snapshot() {
+    if (pwVisible()) return { skipped: 'mot de passe visible' };
+    return {
+      url: location.origin + location.pathname,
+      dialogs: document.querySelectorAll('[role=dialog],[aria-modal=true]').length,
+      deepFiles: typeof deepAll === 'function' ? deepAll('input[type=file]').length : -1,
+      buttons: [...document.querySelectorAll('button, a.btn, [role=button]')].slice(0, 80)
+        .map((b) => ({ tag: b.tagName, type: b.getAttribute('type') || '', label: clean(b.innerText || b.getAttribute('aria-label') || '').slice(0, 40), disabled: !!b.disabled, visible: visible(b) })),
+      fields: [...document.querySelectorAll('input:not([type=hidden]), textarea, select')].slice(0, 80)
+        .map((f) => ({ tag: f.tagName, type: f.type || '', name: (f.name || f.id || '').slice(0, 40), visible: visible(f), len: (f.value || '').length })),
+    };
+  }
+  function scrollToForm() {
+    if (pwVisible()) return false;
+    const el = document.querySelector('input[name="custom-answer-0"]') || document.querySelector('[role=dialog] button[data-testid="apply-form-submit"], [data-cy="submitButton"], textarea[name="job-application-message"]')
+      || [...document.querySelectorAll('button')].find((b) => /^envoyer ma candidature$/i.test(clean(b.innerText)));
+    if (el) el.scrollIntoView({ block: 'center' });
+    return !!el;
+  }
+
+  window.__sosjob = { siteState, snapshot, scrollToForm, clickEntry, submitReady, setCoverLetter, extract, readOptions, fill, toast, pageContext, stepSig, needsLogin, isReview, clickNext, fileInputs, attachFile };
 })();

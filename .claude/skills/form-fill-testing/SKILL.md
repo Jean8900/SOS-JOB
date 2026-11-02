@@ -49,3 +49,9 @@ Passer à l'étape suivante est permis uniquement par les boutons listés dans �
 ## Compte rendu
 
 À la fin : nombre de sites testés, cas corrigés, cas ouverts, et ce qui a été modifié. Ne rien présenter comme corrigé sans l'avoir rejoué.
+
+## Parcours par site (WTJ, Apec...)
+
+Un site au parcours propre (bouton d'entrée, import de CV, étapes) a **une fonction dédiée dans `extension/content.js`** (gardée par le nom d'hôte : `onWtj`, `onApec`) et **une section dans `extension/EDGE_CASES.md`** (parcours, pièges, cas écartés). On n'y touche pas pour un autre site. L'exception sur « postuler » ne vaut que pour le **bouton d'entrée** de ces parcours (il ouvre le formulaire) ; le bouton qui envoie (WTJ : « J'envoie ma candidature ! », Apec : « Envoyer ma candidature ») n'est jamais cliqué. Méthode : lot de 10 offres réelles, `.\batch.ps1`, captures de l'écran final, une ligne de journal par piège.
+
+Pour amener un **nouveau site** au niveau de WTJ (lot de 10 offres réelles, parcours dédié) : voir le skill `site-onboarding`.

@@ -32,56 +32,105 @@ async function toast(tabId, text, ms = 0) {
 
 const MAX_STEPS = 8;
 
+// Envoi au programme local : trace, rapport, capture. Renvoie sa réponse JSON (ou {}).
+async function post(path, body) {
+  try {
+    const r = await fetch(`${BASE}${path}?b=${BROWSER}&i=${await getInstance()}`, { method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return await r.json();
+  } catch (e) { return {}; }
+}
+// Cause de l'échec : une page rechargée en cours d'étape n'est pas un élément introuvable.
+const classify = (e) => (/Frame with ID|was removed|No frame|navigated or closed|context invalidated|Cannot access/i.test(String(e)) ? 'page_rechargee' : 'exception');
+
 // Un seul appui : remplit l'écran, passe à l'étape suivante par un bouton autorisé (jamais l'envoi), recommence.
-// Arrêt : connexion demandée, étape de révision, plus de bouton de passage, étape qui n'avance pas, 8 étapes.
+// Arrêt classé : login, review, submit_ready, no_button, no_progress, max_steps, excluded, page_rechargee, exception.
+// À la fin : état final vérifié (siteState), instantané si échec, capture de l'onglet, rapport envoyé au programme local.
 async function fillAllSteps() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id || !/^https?:/.test(tab.url || '')) return;
   const tabId = tab.id;
   const log = [];
-  let stop = '';
+  const rep = { url: '', steps: [], errors: [], stop: null, state: null, snapshot: null, shot: null };
+  try { const u = new URL(tab.url); rep.url = u.origin + u.pathname; } catch (e) { /* url illisible */ }
+  let stop = '', code = '';
+  const end = (c, text) => { code = c; stop = text; };
   for (const k of Object.keys(pdfCache)) delete pdfCache[k];  // les PDF changent d'une offre à l'autre
-  for (let step = 1; step <= MAX_STEPS && !stop; step++) {
-    await inject(tabId);
-    if (await call(tabId, 0, () => window.__sosjob.needsLogin(), [])) {
-      stop = 'connexion demandée : connecte-toi (ton gestionnaire de mots de passe remplit), puis rappuie sur Ctrl+Alt+Espace';
-      break;
-    }
-    // Welcome to the Jungle : ouvrir le formulaire depuis la page de l'offre
-    if (await call(tabId, 0, () => window.__sosjob.clickEntry(), [])) { log.push('formulaire ouvert'); await sleep(3500); await inject(tabId); }
-    const r = await fillStep(tabId, step);
-    if (r.fatal) { log.push(r.fatal); break; }
-    const up = r.uploaded ? ` + ${r.uploaded} fichier(s)` : '';
-    log.push(r.filled ? `étape ${step} : ${r.filled} champ(s)${up}` : `étape ${step} : ${up ? up.slice(3) : 'rien à remplir'}`);
-    if (await call(tabId, 0, () => window.__sosjob.isReview(), [])) { stop = 'étape de révision : relis et envoie toi-même'; break; }
+  let step = 1;
+  try {
+    for (; step <= MAX_STEPS && !stop; step++) {
+      const st = { n: step };
+      rep.steps.push(st);
+      await inject(tabId);
+      if (await call(tabId, 0, () => window.__sosjob.needsLogin(), [])) {
+        end('login', 'connexion demandée : connecte-toi (ton gestionnaire de mots de passe remplit), puis rappuie sur Ctrl+Alt+Espace');
+        break;
+      }
+      // Welcome to the Jungle : ouvrir le formulaire depuis la page de l'offre
+      if (await call(tabId, 0, () => window.__sosjob.clickEntry(), [])) { log.push('formulaire ouvert'); st.entry = true; await sleep(3500); await inject(tabId); }
+      const r = await fillStep(tabId, step);
+      st.filled = r.filled || 0; st.uploaded = r.uploaded || 0;
+      if (r.fatal) { log.push(r.fatal); end(/désactiv/.test(r.fatal) ? 'excluded' : 'exception', r.fatal); break; }
+      const up = r.uploaded ? ` + ${r.uploaded} fichier(s)` : '';
+      log.push(r.filled ? `étape ${step} : ${r.filled} champ(s)${up}` : `étape ${step} : ${up ? up.slice(3) : 'rien à remplir'}`);
+      if (await call(tabId, 0, () => window.__sosjob.isReview(), [])) { end('review', 'étape de révision : relis et envoie toi-même'); break; }
 
-    // Welcome to the Jungle : formulaire rempli. L'envoi reste à l'utilisateur (le bouton envoie vraiment la candidature).
-    if (await call(tabId, 0, () => window.__sosjob.submitReady(), [])) { stop = "formulaire prêt : clique toi-même sur « J'envoie ma candidature ! »"; break; }
+      // Welcome to the Jungle : formulaire rempli. L'envoi reste à l'utilisateur (le bouton envoie vraiment la candidature).
+      if (await call(tabId, 0, () => window.__sosjob.submitReady(), [])) { end('submit_ready', "formulaire prêt : clique toi-même sur « J'envoie ma candidature ! »"); break; }
 
-    // bouton de passage (dans le premier cadre qui en a un)
-    const before = await call(tabId, 0, () => window.__sosjob.stepSig(), []);
-    const frames = await chrome.webNavigation?.getAllFrames?.({ tabId }) ?? [{ frameId: 0 }];
-    let clicked = '';
-    for (const { frameId } of frames) {
-      try { clicked = await call(tabId, frameId, () => window.__sosjob?.clickNext() || '', []); } catch (e) { /* cadre inaccessible */ }
-      if (clicked) break;
-    }
-    if (!clicked) { stop = 'plus de bouton « Suivant » : relis et envoie toi-même'; break; }
+      // bouton de passage (dans le premier cadre qui en a un)
+      const before = await call(tabId, 0, () => window.__sosjob.stepSig(), []);
+      const frames = await chrome.webNavigation?.getAllFrames?.({ tabId }) ?? [{ frameId: 0 }];
+      let clicked = '', clickErr = '';
+      for (const { frameId } of frames) {
+        try { clicked = await call(tabId, frameId, () => window.__sosjob?.clickNext() || '', []); }
+        catch (e) { clickErr = String(e).slice(0, 160); rep.errors.push({ step, where: 'clickNext', frame: frameId, kind: classify(e), msg: clickErr }); }
+        if (clicked) break;
+      }
+      st.clicked = clicked;
+      if (!clicked) {
+        if (clickErr) end(classify(clickErr), `étape ${step} interrompue : ${clickErr}`);
+        else end('no_button', 'plus de bouton « Suivant » : relis et envoie toi-même');
+        break;
+      }
 
-    // attendre l'écran suivant (rechargement de page ou nouveau contenu)
-    let moved = false;
-    for (let i = 0; i < 24 && !moved; i++) {
-      await sleep(500);
-      try {
-        await inject(tabId);
-        moved = (await call(tabId, 0, () => window.__sosjob.stepSig(), [])) !== before;
-      } catch (e) { /* page en cours de chargement */ }
+      // attendre l'écran suivant (rechargement de page ou nouveau contenu)
+      let moved = false;
+      for (let i = 0; i < 24 && !moved; i++) {
+        await sleep(500);
+        try {
+          await inject(tabId);
+          moved = (await call(tabId, 0, () => window.__sosjob.stepSig(), [])) !== before;
+        } catch (e) { /* page en cours de chargement */ }
+      }
+      st.moved = moved;
+      if (!moved) { end('no_progress', `l'étape ${step} n'avance pas (clic sans effet ou champ obligatoire manquant) : complète à la main`); break; }
+      await sleep(800);
     }
-    if (!moved) { stop = `l'étape ${step} n'avance pas (champ obligatoire manquant ?) : complète à la main`; break; }
-    await sleep(800);
+    if (!stop) end('max_steps', `${MAX_STEPS} étapes atteintes : continue à la main`);
+  } catch (e) {
+    rep.errors.push({ step, where: 'boucle', kind: classify(e), msg: String(e).slice(0, 200) });
+    end(classify(e), `erreur à l'étape ${step} : ${String(e).slice(0, 120)}`);
   }
-  if (!stop) stop = `${MAX_STEPS} étapes atteintes : continue à la main`;
+  rep.stop = { code, text: stop };
   await toast(tabId, `SOS-JOB : ${log.join(' ; ')}. Arrêt : ${stop}`, 15000);
+
+  // État final, instantané et capture : jamais si un champ mot de passe est visible.
+  try {
+    await inject(tabId);
+    if (!(await call(tabId, 0, () => window.__sosjob.needsLogin(), []))) {
+      const exp = { cv: pdfCache.cv?.name || '', lm: pdfCache.lm?.name || '' };
+      rep.state = await call(tabId, 0, (e) => window.__sosjob.siteState?.(e), [exp]);
+      const failed = (rep.state?.criteria || []).some((c) => !c.ok) || !['review', 'submit_ready', 'no_button'].includes(code);
+      if (failed) rep.snapshot = await call(tabId, 0, () => window.__sosjob.snapshot?.(), []);
+      await call(tabId, 0, () => window.__sosjob.scrollToForm?.(), []);
+      await sleep(700);
+      const png = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+      const saved = await post('/shot', { url: rep.url, png });
+      rep.shot = saved.path || null;
+    }
+  } catch (e) { rep.errors.push({ step, where: 'état final', kind: classify(e), msg: String(e).slice(0, 160) }); }
+  rep.log = log;
+  await post('/report', rep);
   return log.join(' ; ') + ' | ' + stop;
 }
 

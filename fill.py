@@ -12,7 +12,9 @@ Usage : python fill.py   (Ctrl+C pour arrêter)
 """
 from __future__ import annotations
 
+import base64
 import json
+import re
 import sys
 import threading
 import time
@@ -43,6 +45,61 @@ instance_browser: dict[str, str] = {}
 last_seen: dict[str, float] = {"chrome": 0.0, "edge": 0.0}
 busy_since: dict[str, float] = {"chrome": 0.0, "edge": 0.0}  # 0 = libre ; un ordre sans réponse expire après 2 min
 last_note: dict[str, str] = {"chrome": "", "edge": ""}  # compte rendu du dernier remplissage (lu par batch.py via /result)
+
+
+REPORTS_DIR = REPO_ROOT / "output" / "copilot" / "reports"
+SHOTS_DIR = REPO_ROOT / "output" / "copilot" / "shots"
+TRACE_PATH = REPO_ROOT / "output" / "copilot" / "trace.log"
+KEEP = 3  # rapports et captures gardés par offre (pour comparer avant / après une correction)
+last_report: dict[str, dict] = {}
+
+
+def offer_key(url: str) -> str:
+    """Clé d'offre lisible : hôte + fin du chemin, sans paramètres ni valeur perso."""
+    parts = urlparse(url)
+    tail = "-".join(p for p in parts.path.split("/") if p)[-48:]
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", f"{parts.hostname or 'web'}_{tail}")[:90]
+
+
+def prune(folder: Path, key: str, suffix: str) -> None:
+    files = sorted(folder.glob(f"{key}__*{suffix}"))
+    for old in files[:-KEEP]:
+        old.unlink(missing_ok=True)
+
+
+def save_report(browser: str, rep: dict) -> None:
+    """Rapport structuré d'un remplissage : fichier JSON (3 derniers par offre) + lignes de trace.log."""
+    key = offer_key(rep.get("url", ""))
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    rep["ts"] = time.time()
+    rep["key"] = key
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    (REPORTS_DIR / f"{key}__{stamp}.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
+    prune(REPORTS_DIR, key, ".json")
+    last_report[browser] = rep
+    lines = [f"{time.strftime('%H:%M:%S')} {key}"]
+    for st in rep.get("steps", []):
+        lines.append(f"  étape {st.get('n')} : champs={st.get('filled', 0)} fichiers={st.get('uploaded', 0)} clic={st.get('clicked') or '-'} avancé={st.get('moved', '-')}")
+    for err in rep.get("errors", []):
+        lines.append(f"  ERREUR étape {err.get('step')} [{err.get('kind')}] {err.get('where')} : {err.get('msg')}")
+    for crit in (rep.get("state") or {}).get("criteria", []):
+        lines.append(f"  {'OK ' if crit.get('ok') else 'KO '} {crit.get('k')} {crit.get('v', '')}")
+    stop = rep.get("stop") or {}
+    lines.append(f"  arrêt [{stop.get('code')}] {stop.get('text')}")
+    if rep.get("shot"):
+        lines.append(f"  capture {rep['shot']}")
+    TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with TRACE_PATH.open("a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
+def save_shot(url: str, data_url: str) -> str:
+    key = offer_key(url)
+    SHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = SHOTS_DIR / f"{key}__{time.strftime('%Y%m%d-%H%M%S')}.png"
+    path.write_bytes(base64.b64decode(data_url.split(",", 1)[-1]))
+    prune(SHOTS_DIR, key, ".png")
+    return str(path.relative_to(REPO_ROOT))
 
 
 def log(message: str) -> None:
@@ -152,13 +209,22 @@ def make_handler(cfg: dict, port: int):
                 self.end_headers()
                 self.wfile.write(data)
                 return None
+            if url.path == "/report":  # batch.py --debug : dernier rapport de remplissage
+                return self._send(200, {"report": last_report.get(browser)})
             self._send(404)
 
         def do_POST(self) -> None:
-            if not self._allowed() or self.headers.get("X-SOSJOB") != "1" or self.path != "/answers":
+            url = urlparse(self.path)
+            if not self._allowed() or self.headers.get("X-SOSJOB") != "1" or url.path not in ("/answers", "/report", "/shot"):
                 return self._send(403)
+            browser = (parse_qs(url.query).get("b") or ["chrome"])[0]
             try:
                 payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                if url.path == "/report":
+                    save_report(browser if browser in orders else "chrome", payload)
+                    return self._send(200, {"ok": True})
+                if url.path == "/shot":
+                    return self._send(200, {"path": save_shot(payload.get("url", ""), payload["png"])})
                 if formfill.is_excluded(payload["url"], cfg):
                     return self._send(200, {"excluded": formfill.urlparse(payload["url"]).hostname})
                 fields = payload["fields"]
@@ -170,7 +236,7 @@ def make_handler(cfg: dict, port: int):
                 final, short = formfill.finalize_answers(fields, answers)
                 log(f"{len(final)}/{len(fields)} réponse(s) en {time.time() - started:.0f}s pour {formfill.urlparse(payload['url']).hostname}")
                 self._send(200, {"answers": final, "short": short})
-            except Exception as exc:  # un échec de rédaction ne doit jamais arrêter le serveur
+            except Exception as exc:  # un échec ne doit jamais arrêter le serveur
                 log(f"échec : {exc}")
                 self._send(200, {"error": str(exc)[:160]})
 

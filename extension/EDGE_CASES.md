@@ -104,3 +104,79 @@ Aucun bouton d'envoi n'a été cliqué.
 - **Symptôme** : la question « Expliquez-nous pourquoi vous souhaitez nous rejoindre ! » restait vide (ou « . ») sur 4 offres WTJ sur 10. **Cause** : le programme local recevait une offre générique (page web), donc le modèle ne voyait pas la LM de l'offre ; devant une question sans fait dans le CV il répondait `null`, qui devenait « . ».
 - **Correction** (`src/formfill.py` : `staged_letter`, `complete_answers`) : (1) le texte de la LM déposée dans le dossier d'upload (moins d'1 h) est donné au modèle et posé tel quel dans un champ dont le libellé évoque la motivation ; (2) seconde passe de `claude -p`, uniquement sur les champs obligatoires encore vides ou à « . », avec la consigne « tu DOIS répondre » (réponse honnête, rien d'inventé). Les champs déjà remplis ne sont pas repris. Testé hors navigateur (permis, question de motivation, question sans expérience).
 - **Permis B boîte manuelle** : fait perso `driving_license` dans `input/form_profile.yaml` (exemple dans `form_profile.example.yaml`) : oui.
+
+## Apec : candidature intégrée (2026-11-02)
+
+- **Offres visées** : `typeCandidature == "EMAIL_ONLY"` dans l'API de détail (`/cms/webservices/offre/public?numeroOffre=...`) = candidature sur l'Apec. `URL_ONLY` (renvoi chez l'employeur : aplitrak, basf.jobs...) et `EMAIL_URL` : écartés.
+- **Lister les offres** : l'API de recherche (`/cms/webservices/rechercheOffre`, POST) répond 403 à Python et à Playwright (anti-bot), mais fonctionne depuis une page Apec de ton Chrome connecté. Le lot est donc établi depuis ce navigateur et déposé dans `output/copilot/apec_lot.json` (ce n'est pas encore une commande autonome).
+- **Parcours** (code : `apecNext()` dans `content.js`, appelé par `clickNext` sur `apec.fr` seulement ; le code WTJ n'est pas touché) :
+  1. page de l'offre : lien « Postuler » vers `postuler-a-une-offre.html` ;
+  2. `#/candidature/promotion/<id>` : bouton « Postuler » (bis), sans prendre l'échange avec un conseiller ;
+  3. `#/candidature/formulaire/<id>` : radio « Je préfère joindre uniquement un CV », puis « Importer un CV », import du CV (`input[type=file]`, 3 Mo max), puis soit « Joindre ma lettre de motivation » + import de la LM, soit (offre sans LM) bloc repliable « Ajouter un message au recruteur ? » à déplier ;
+  4. arrêt : « Envoyer ma candidature » (actif quand le formulaire est complet) n'est **jamais** cliqué : il envoie vraiment.
+- **Pièges rencontrés** : (a) radios Angular sans `for=` (`<div><input><label>`) : l'entrée est le frère qui précède le libellé ; (b) cocher/décocher une case ne change pas l'écran, donc l'étape paraît « ne pas avancer » : le décochage est fait pendant le remplissage, pas comme étape de passage ; (c) les champs fichier n'existent qu'une fois « Importer » choisi : sur Apec, seuls les champs visibles reçoivent un fichier ; (d) Apec **pré-remplit** le message (« Bonjour, je me permets de vous solliciter… ») : il est effacé puis remplacé par un message personnalisé (3 à 4 phrases) ; (e) un champ mot de passe masqué existe dans le menu : ce n'est pas un écran de connexion (vérifier sa visibilité, pas sa seule présence).
+- **Compte Apec** : « Enregistrer le CV / la lettre dans mon compte » est coché par défaut ; l'extension le décoche pour ne pas empiler dix CV adaptés dans le compte. « Données complémentaires » : jamais touchée.
+- **Lot du jour** : 10 offres « génie chimique » (10 entreprises), toutes jusqu'à « Envoyer ma candidature » activé (voir compte rendu de session).
+
+## Free-Work : deux boutons, un seul à utiliser (2026-11-02)
+
+- **« Je postule » = candidature rapide : envoie immédiatement** la candidature avec le profil et le CV du compte, sans message (message « Envoyé »). Découvert par un clic involontaire à l'exploration (offre hors profil, ALLEGIS GROUP). **Ne jamais le cliquer** : on n'y choisit ni le CV ni le message.
+- **« Postuler » (bouton distinct) = candidature avec formulaire** (« Postuler à cette offre » : CV, message). C'est celui à traiter pour envoyer **le CV adapté** et **un message personnalisé** (quelques centaines de caractères, comme sur Apec/WTJ).
+- **Problèmes constatés** (à corriger) : (1) le CV du compte est utilisé, pas le CV adapté à l'offre ; (2) aucun message personnalisé n'est écrit ; (3) une offre sur 10 renvoie hors de Free-Work (site de l'employeur) : à repérer et à **écarter**.
+- **Erreur de méthode (à ne pas refaire)** : j'ai d'abord **exclu Free-Work entier du remplissage** (`fill_excluded_domains`) pour éviter le clic qui envoie. C'est un contournement, pas un parcours : retiré, on traite les offres internes au site.
+- **Corrigé (vérifié à l'écran)** : le message personnalisé est écrit (champ `job-application-message`, 559/2000 caractères), avec un libellé qui force un message court et non générique.
+- **CV adapté : en cours.** Le CV « partagé » est le CV de la CVthèque publique (visible des recruteurs) : on ne le remplace pas. Piste retenue : le joindre en « Document additionnel » (bouton « Ajouter » / « Add » -> fenêtre « Mes documents » / « My documents » -> onglet « Ajouter un document » -> champ fichier `.pdf` **dans un shadow DOM** (parcours via `deepAll`) -> « Envoyer le document » -> « Joindre le document »). Fait : ouverture de la fenêtre. **Reste** : onglet, import, envoi, jointure (la fenêtre « My documents » dépasse de l'écran de test, donc relevé visuel incomplet). Piège : la page s'affiche parfois en **anglais** (`/en-gb/`, « Apply to this job » = le bouton qui envoie) : les motifs de boutons sont bilingues. Chaque document ajouté reste dans le compte (empreinte à surveiller).
+- **Parcours validé (2026-11-02, 3 offres internes, critères ✓ au rapport)** : « Éditer » (le **clic recharge la page** : rendre la main aussitôt, sans attendre) -> importer le CV -> « Envoyer mon CV » (pas de rechargement) -> menu ⋮ du **dernier** CV de la liste -> entrée `button[role=menuitem]` « Make Default CV » / « Partager le CV » (cliquer le `li` autour ou le bouton « Make Default CV » du bas ne fait rien : ce dernier vise le CV déjà sélectionné) -> « Document additionnel » -> « Ajouter » -> importer la LM -> « Envoyer le document » -> **sélectionner la carte de la LM**, puis « Joindre le document » (inactif sinon).
+- **Pièges** : (a) un clic sur « Éditer » avant l'hydratation de la page est ignoré : attendre 2,5 s ; (b) ouvrir `/fr/...` fait recharger la page tard vers `/en-gb/` (`apply.py` ouvre donc `/en-gb/` directement) ; (c) les flux ne changent pas toujours l'écran : un compteur (`data-sosjob-ticks`) dans `stepSig` évite le faux « n'avance pas » ; (d) le site renomme parfois les fichiers : le critère `cv_adapte` lit le nom du CV **par défaut** ; (e) **offre hors site** : « Apply to this job » est un lien `A` (et non un `button` submit) et il n'y a pas de formulaire -> critère `hors_site` (écartée, pas un échec).
+- **Effets dans le compte Free-Work** : le CV adapté devient le CV **par défaut** (donc celui de la CVthèque) et chaque passage ajoute un CV et un document : à nettoyer après les tests.
+- **Statut** : validé sur 3 offres internes ; offre n° 633 : hors site (détectée, `hors_site` pas encore rejoué).
+
+## HelloWork : candidature intégrée (2026-11-02)
+
+- **Offres** : `https://www.hellowork.com/fr-fr/emplois/<id>.html`. Lister depuis le Chrome connecté (page de recherche `emploi/recherche.html?k=...`). Le CV importé remplace le CV enregistré du compte pour cette candidature.
+- **Parcours** (`helloNext()` dans `content.js`, gardé par `onHello`) : lien « Postuler » de l'en-tête (`a[data-cy=applyButtonHeader]`, ancre `#postuler`) -> formulaire sur la même page : prénom, nom, e-mail (préremplis par le compte), CV (liste des CV enregistrés + « Utiliser un nouveau CV », champ fichier masqué `input#upload`, 2 Mo max), bloc « Personnaliser mon message au recruteur » -> bouton noir « Postuler » (`button[data-cy=submitButton]`, dans le formulaire) = **l'envoi** : jamais cliqué.
+- **Pièges** : (a) le bloc message est une case cachée `#cover-letter-collapse-funnel` pilotée par son `<label>` ; le champ `MotivationLetter` est « visible » (largeur) même replié (conteneur `max-h-0`) : se fier à l'état de la case, pas à la géométrie ; (b) déplier ne change pas l'écran, donc le faire pendant le remplissage (`helloOpenMessage`, appelé par `fileInputs`), pas comme étape de passage ; (c) le champ fichier est masqué : on y pose le PDF directement (pas de clic sur « Utiliser un nouveau CV » : un clic de script n'ouvre pas le sélecteur de fichiers) ; (d) le message reçoit le texte de la LM (limite 2900 caractères).
+- **Bouton qui soumet (HelloWork, vérifié par un envoi de test sur une offre Reisel, technicien de maintenance)** : le bouton noir « Postuler » du formulaire (`button[data-cy=submitButton]`) envoie immédiatement : toast « Votre candidature … va être transmise à <entreprise> », puis redirection vers `/fr-fr/bounce/skills?origin=ResponseOffer` (« Enrichissez votre profil »). **Pas de 2e confirmation.** Le CV du formulaire est celui du compte (liste), le fichier importé le remplace. Un clic souris à l'aveugle sur une autre offre n'a produit aucune confirmation visible : se fier à « Mes candidatures » (`/fr-fr/candidat/mes-candidatures.html`) pour vérifier un envoi.
+
+## Cadremploi : exploration (2026-11-02, non terminé)
+
+- **Formulaire déjà sur la page de l'offre** (« Envoyez votre candidature ! ») : Nom, Prénom, e-mail (désactivé) préremplis, CV enregistré, case « Je souhaite recevoir des offres similaires » (marketing : ne pas cocher), « Personnaliser ma lettre de motivation » (repliable), bouton rouge « Postuler » **dans le formulaire = envoi**. Les « Postuler » du bandeau et du bas de page font défiler vers ce formulaire.
+- **Piège** : le bouton qui affiche le CV enregistré n'a pas d'attribut `type` : c'est donc un bouton **submit**. Un clic dessus (par script) a provoqué « Une erreur est survenue lors de l'envoi de votre candidature » (tentative d'envoi qui a échoué, offre hors profil) et a révélé le champ fichier (`.pdf,.rtf,.doc,.docx`, 3 Mo). Aucun champ fichier n'existe avant ce clic.
+- **À résoudre** : importer le CV adapté sans déclencher un envoi (piste : empêcher la soumission pendant le clic de l'extension, ou trouver le vrai déclencheur d'import) ; vérifier dans l'espace candidat si une candidature est partie (la page « mes candidatures » n'a pas été trouvée).
+
+### HelloWork : message prérempli (problème)
+
+- Le champ « Personnaliser mon message au recruteur » est **prérempli par le site** (« Madame, Monsieur, Suite à votre offre de … chez …, je me permets de vous adresser ma candidature. »). Comme il n'est pas vide, il était ignoré : le message envoyé serait le texte générique du site. **Corrigé (vérifié à l'écran sur une offre) : il est effacé puis remplacé par un message personnalisé** (même traitement que le message Apec).
+
+### Cadremploi : deux types d'offres (note)
+
+- Une offre Cadremploi est soit **« candidature en un clic » interne à Cadremploi** (formulaire sur la page, traitable), soit **candidature sur le site de l'entreprise** (renvoi externe) : ces dernières sont **mises de côté**, hors périmètre.
+
+## Station F Jobs : exploration (2026-11-02, non terminé)
+
+- **Plateforme WelcomeKit** (comme WTJ). Liste : `https://jobs.stationf.co/search` ; offre : `/companies/<entreprise>/jobs/<slug>`. Aucune connexion requise pour candidater (le formulaire demande tout).
+- **Parcours** : lien « POSTULER » (deux sur la page, ancres vers la même page) -> fenêtre « Formulaire de Candidature » (colorbox, probablement dans un cadre) : First name*, Last name*, Current position*, Email*, Phone*, Address, puis la suite (CV, message, envoi) **pas encore relevée**.
+- **À faire** : relever la suite du formulaire et le bouton d'envoi ; coder `onStationF` ; lot de 10 offres hors profil ; repérer les offres qui sortent du site.
+
+## Observabilité : rapport structuré par offre (2026-11-02)
+
+- **Ce que l'extension envoie au programme local** (`background.js` -> `/report`, `/shot`) : étapes (champs, fichiers, libellé cliqué, écran avancé ou non), erreurs avec leur cause classée, **état final vérifié par critère** (`siteState()` de `content.js` : CV adapté affiché, message personnalisé et non celui du site, LM jointe, bouton d'envoi actif), **instantané** de la page en cas d'échec (`snapshot()` : boutons avec type et état, champs avec nom et longueur, jamais de valeur) et **capture de l'onglet** après défilement vers la zone utile (`captureVisibleTab`, sans dépendre du focus).
+- **Classement des arrêts** : `login`, `review`, `submit_ready`, `no_button`, `no_progress` (clic sans effet), `max_steps`, `excluded`, `page_rechargee` (la page se recharge en cours d'étape, ex. Free-Work « Éditer »), `exception`.
+- **Où lire** : `output/copilot/trace.log` (une section par offre), `output/copilot/reports/<offre>__<date>.json` et `output/copilot/shots/<offre>__<date>.png` (3 derniers par offre). Dans le lot : `.\batch.ps1 ... --debug` affiche trace, état, boutons et chemin de la capture ; sans `--debug`, une ligne ✓/✗ par critère.
+- **Garde-fous** : ni capture ni relevé quand un champ mot de passe est visible ; aucune valeur perso (noms de fichiers, longueurs, booléens seulement) ; plafond de 5 passages par offre et par jour (`--force-replay` pour passer outre).
+- **Nécessite un rechargement de l'extension** (`background.js` a changé) ; avec l'ancienne version, le lot n'affiche pas de critères.
+
+### Free-Work : encombrement du compte (décision)
+
+- Chaque passage ajoute au compte un CV et un document : les anciens s'accumulent (plusieurs `CV_Jean_Martini.pdf`, `LM_Jean_Martini.pdf`).
+- **L'extension ne supprime rien** (« Delete » du menu ⋮ = suppression définitive de données du compte : à faire à la main). À la place, le rapport affiche `cv_dans_compte` (nombre de CV déjà présents avant le passage) et le signale au-delà de 6.
+- **Réutiliser un fichier de même nom n'est pas possible** : le CV est adapté à chaque offre, le contenu change alors que le nom reste `CV_Jean_Martini.pdf`.
+- **Nettoyage conseillé** : `Edit` (CV par défaut) -> menu ⋮ de chaque ancien CV -> Delete ; garder le CV par défaut du moment et ton CV d'origine.
+
+### Free-Work : questions personnalisées de l'offre (2026-11-02)
+
+- **Symptôme** : l'offre « Technicien de Proximité Référent » pose 4 questions OUI/NON obligatoires (`Etes vous mobile sur Paris ? *`, TJM/salaire, technologies Citrix/ITIL/Office 365, 5 ans d'expérience) ; seul le message était rempli.
+- **Cause** : de vrais radios `custom-answer-0..3`, mais le texte de la question est **un niveau plus haut** que le conteneur des deux libellés « OUI / NON » ; l'extraction ne voyait qu'un groupe sans question, donc sans réponse possible.
+- **Correction** : (1) `extract()` remonte jusqu'à trouver un texte (hors options) pour un groupe radio sans `fieldset` ; (2) la seconde passe de `claude -p` couvre aussi les choix obligatoires (radio, oui/non, listes) avec la consigne « option la plus honnête d'après le CV, NON si le CV ne prouve pas l'expérience, OUI pour la mobilité sur Paris » ; (3) critère `questions_a_choix` (toutes les questions répondues) dans le rapport ; (4) la capture défile jusqu'aux questions.
+- **Vérifié** : 4/4 répondues sur l'offre (mobile OUI, TJM OUI, technologies NON, 5 ans NON attendu). **À relire par l'utilisateur** : une réponse OUI/NON engage (TJM, expérience).
+- **Déboguer sans polluer le compte** : `.atch.ps1 ... --no-files` ne dépose ni CV ni LM (le compte Free-Work en contient déjà 19 : critère `cv_dans_compte` ✗, à nettoyer à la main).

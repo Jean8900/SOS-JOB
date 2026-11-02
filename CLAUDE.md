@@ -16,5 +16,5 @@
 - Une entreprise qui échoue au scraping (`src/scraper.py`) ne doit jamais
   interrompre les autres : logguer l'erreur et continuer.
 - Extension de remplissage (`extension/`, `fill.py`, `src/formfill.py`) : ne jamais cliquer sur un
-  bouton d'envoi final ni saisir d'identifiant ; les infos perso vivent dans `input/form_profile.yaml`
+  bouton d'envoi final (le code ne le clique jamais ; seul l'envoi de test unique par site, décidé par l'utilisateur, est fait à la main, voir le skill `site-onboarding`) ni saisir d'identifiant ; les infos perso vivent dans `input/form_profile.yaml`
   (hors git) ; cas limites dans `extension/EDGE_CASES.md`, méthode dans `.claude/skills/form-fill-testing`.

@@ -46,6 +46,8 @@ def apply_url(offer: Offer) -> str:
     url = offer.url
     if offer.source == "lever" and not url.rstrip("/").endswith("/apply"):
         url = url.rstrip("/") + "/apply"
+    elif offer.source == "free_work":  # /fr/ est redirigé tard vers /en-gb/ (la page se recharge en pleine candidature) : ouvrir /en-gb/ directement
+        url = url.replace("free-work.com/fr/", "free-work.com/en-gb/")
     elif offer.source == "ashby" and not url.rstrip("/").endswith("/application"):
         url = url.rstrip("/") + "/application"
     return url

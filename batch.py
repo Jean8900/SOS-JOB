@@ -47,12 +47,23 @@ def pick(n: int, source: str | None) -> list[tuple[str, object]]:
     return mixed[:n]
 
 
-def lot_offers(n: int, skip: int) -> list[tuple[str, object]]:
-    """Offres préparées par wtj_prepare.py (output/copilot/wtj_lot.json), de la skip-ième à la skip+n-ième."""
-    lot = json.loads((REPO_ROOT / "output" / "copilot" / "wtj_lot.json").read_text(encoding="utf-8"))
+def lot_offers(n: int, skip: int, lot_file: str | None = None) -> list[tuple[str, object]]:
+    """Offres d'un lot préparé (wtj_prepare.py -> wtj_lot.json, ou --lot-file), de la skip-ième à la skip+n-ième."""
+    path = Path(lot_file) if lot_file else REPO_ROOT / "output" / "copilot" / "wtj_lot.json"
+    lot = json.loads(path.read_text(encoding="utf-8"))
     offers = [Offer(source=o["source"], source_id=o["source_id"], url=o["url"], url_canonique=o["url"], title=o["title"],
-                    company=o["company"], location=o.get("location", "")) for o in lot]
+                    company=o["company"], location=o.get("location", ""), description=o.get("description", "")) for o in lot]
     return [(o.source_id, o) for o in offers[skip:skip + n]]
+
+
+def ensure_pdfs(offer) -> None:
+    """Génère CV et LM de l'offre s'ils n'existent pas encore."""
+    from src import cv_builder, lm_builder
+    cv, lm = applications.locate_pdfs(offer)
+    if cv is None:
+        cv_builder.generate_cv_for_job(offer)
+    if lm is None:
+        lm_builder.generate_lm_for_job(offer)
 
 
 def call(port: int, route: str, browser: str) -> dict:
@@ -100,6 +111,58 @@ def run_one(port: int, browser: str, chrome: str, profile: str, url: str, wait: 
     return "délai dépassé"
 
 
+def fetch_report(port: int, started: float) -> dict | None:
+    """Rapport structuré de l'extension pour le remplissage qui vient de finir (None avec une ancienne extension)."""
+    try:
+        rep = call(port, "/report", "chrome").get("report")
+    except OSError:
+        return None
+    return rep if rep and rep.get("ts", 0) >= started else None
+
+
+def criteria_line(rep: dict | None) -> str:
+    crit = ((rep or {}).get("state") or {}).get("criteria") or []
+    return "  ".join(f"{'○' if c.get('skip') else ('✓' if c['ok'] else '✗')} {c['k']}" for c in crit)
+
+
+def debug_block(rep: dict) -> str:
+    """Trace, état final et capture d'une offre, en un bloc."""
+    out = []
+    for st in rep.get("steps", []):
+        out.append(f"      étape {st.get('n')} : champs={st.get('filled', 0)} fichiers={st.get('uploaded', 0)} clic={st.get('clicked') or '-'} avancé={st.get('moved', '-')}")
+    for err in rep.get("errors", []):
+        out.append(f"      ERREUR étape {err.get('step')} [{err.get('kind')}] {err.get('where')} : {err.get('msg')}")
+    for c in ((rep.get("state") or {}).get("criteria") or []):
+        out.append(f"      {'○' if c.get('skip') else ('✓' if c['ok'] else '✗')} {c['k']} {c.get('v', '')}")
+    stop = rep.get("stop") or {}
+    out.append(f"      arrêt [{stop.get('code')}] {stop.get('text')}")
+    snap = rep.get("snapshot")
+    if snap and not snap.get("skipped"):
+        btns = [f"{b['label']}({b['type'] or b['tag']}{',off' if b['disabled'] else ''}{'' if b['visible'] else ',caché'})" for b in snap.get("buttons", []) if b["label"]][:25]
+        out.append("      boutons : " + " | ".join(btns))
+    if rep.get("shot"):
+        out.append(f"      capture : {rep['shot']}")
+    return "\n".join(out)
+
+
+MAX_REPLAYS = 5  # par offre et par jour : certains essais laissent des traces dans le compte du site (un CV de plus sur Free-Work)
+REPLAYS = REPO_ROOT / "output" / "copilot" / "replays.json"
+
+
+def count_replay(url: str) -> int:
+    """Incrémente et renvoie le nombre de passages du jour sur cette offre."""
+    today = time.strftime("%Y-%m-%d")
+    try:
+        data = json.loads(REPLAYS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if data.get("_day") != today:
+        data = {"_day": today}
+    data[url] = data.get(url, 0) + 1
+    REPLAYS.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    return data[url]
+
+
 def save(report: list[dict]) -> None:
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -110,6 +173,11 @@ def main() -> None:
     parser.add_argument("-n", type=int, default=10)
     parser.add_argument("--source")
     parser.add_argument("--lot", action="store_true", help="offres de wtj_prepare.py au lieu des offres en attente")
+    parser.add_argument("--lot-file", help="fichier JSON d'offres (source, source_id, url, title, company, description)")
+    parser.add_argument("--generate", action="store_true", help="générer CV et LM manquants avant d'ouvrir")
+    parser.add_argument("--debug", action="store_true", help="affiche trace, état final, instantané et capture de chaque offre")
+    parser.add_argument("--force-replay", action="store_true", help=f"passer outre le plafond de {MAX_REPLAYS} passages par offre et par jour")
+    parser.add_argument("--no-files", action="store_true", help="ne dépose ni CV ni LM (déboguer les champs sans ajouter de documents au compte du site)")
     parser.add_argument("--skip", type=int, default=0, help="avec --lot : nombre d'offres à sauter")
     parser.add_argument("--wait", type=float, default=7.0, help="secondes d'attente du chargement de la page")
     args = parser.parse_args()
@@ -125,7 +193,7 @@ def main() -> None:
     except OSError:
         raise SystemExit("Programme local arrêté : lance .\\fill.ps1 install (ou python fill.py).")
 
-    offers = lot_offers(args.n, args.skip) if args.lot else pick(args.n, args.source)
+    offers = lot_offers(args.n, args.skip, args.lot_file) if (args.lot or args.lot_file) else pick(args.n, args.source)
     if not offers:
         raise SystemExit("Aucune offre en attente avec CV et LM générés (.\\run.ps1).")
     print(f"{len(offers)} offre(s), une par onglet de ton Chrome. Ne touche pas au clavier pendant le lot.")
@@ -134,11 +202,32 @@ def main() -> None:
     waiting: list[tuple[dict, object]] = []
 
     def process(offer, entry: dict) -> None:
-        stage_files(offer, staging, cfg["file_name"])
+        if count_replay(entry["url"]) > MAX_REPLAYS and not args.force_replay:
+            entry["note"] = f"plafond de {MAX_REPLAYS} passages par jour atteint (--force-replay pour passer outre)"
+            entry["login_needed"] = False
+            print(f"  [{entry['source']}] {entry['title'][:50]} -> {entry['note']}")
+            return
+        if args.no_files:
+            for f in staging.glob("*"):
+                f.unlink(missing_ok=True)
+        else:
+            stage_files(offer, staging, cfg["file_name"])
+        started = time.time()
         entry["note"] = run_one(port, "chrome", chrome, profile, apply_url(offer), args.wait)
         entry["login_needed"] = "connexion demandée" in entry["note"]
+        rep = fetch_report(port, started)
+        entry["criteria"] = [{"k": c["k"], "ok": c["ok"]} for c in ((rep or {}).get("state") or {}).get("criteria", [])]
         print(f"  [{entry['source']}] {entry['title'][:50]} -> {entry['note']}")
+        if rep and criteria_line(rep):
+            print(f"      {criteria_line(rep)}")
+        if rep and args.debug:
+            print(debug_block(rep))
         save(report)
+
+    if args.generate:  # CV et LM manquants, avant d'ouvrir quoi que ce soit
+        for _, offer in offers:
+            print(f"  CV/LM : {offer.company}")
+            ensure_pdfs(offer)
 
     for key, offer in offers:
         entry = {"key": key, "source": offer.source, "title": offer.title, "company": offer.company, "url": apply_url(offer)}

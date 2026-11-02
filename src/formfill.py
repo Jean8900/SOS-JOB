@@ -95,7 +95,7 @@ MUST_ANSWER = (
     "SECONDE PASSE : ces champs sont OBLIGATOIRES et sont restés vides à la première passe. Chacun DOIT recevoir une vraie réponse : "
     "ni null, ni \".\", ni phrase vide. Question ouverte (motivation, pourquoi nous rejoindre, expérience...) : 3 à 5 phrases sincères "
     "tirées du CV, de la lettre déjà écrite et de l'offre ; sans fait inventé (si le CV ne couvre pas le sujet, dis honnêtement ce qui s'en "
-    "rapproche et la motivation à apprendre). Liste ou case : choisis l'option la plus proche.\n\n"
+    "rapproche et la motivation à apprendre). Question à choix (OUI/NON, liste) : choisis l'option la plus honnête d'après le CV et les FAITS PERSO, copiée à l'identique parmi les options ; NON si le CV ne prouve pas l'expérience demandée ; OUI pour la mobilité sur Paris (candidat basé en Île-de-France).\n\n"
 )
 
 _LETTER_LABEL = re.compile(r"motivation|cover.?letter|lettre|pourquoi (?:vous|nous|tu|souhait\w+).*(?:rejoindre|postul|candidat)|why .*(?:join|apply)", re.I)
@@ -327,7 +327,7 @@ def complete_answers(offer: Offer, fields: list[dict], answers: dict, cfg: dict,
     for field in fields:
         if letter and field.get("kind") == "textarea" and _empty(answers, field) and _LETTER_LABEL.search(field.get("label", "")):
             answers[field["id"]] = letter
-    todo = [f for f in fields if f.get("kind") in ("textarea", "input") and _empty(answers, f)
+    todo = [f for f in fields if f.get("kind") in ("textarea", "input", "radio", "yesno", "select", "dropdown", "combobox") and _empty(answers, f)
             and (f.get("required") or "*" in f.get("label", ""))]
     if todo:
         second = generate_answers(offer, [dict(f) for f in todo], cfg, letter=letter, must_answer=True)
