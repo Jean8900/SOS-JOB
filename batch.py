@@ -4,10 +4,12 @@ Pour chaque offre : copie le CV et la LM de l'offre dans le dossier d'upload, ou
 (session et gestionnaire de mots de passe habituels), puis commande à l'extension le même remplissage que
 Ctrl+Alt+Espace (champs, CV/LM, étapes suivantes). Jamais de clic sur un envoi : l'extension s'arrête avant.
 Les onglets restent ouverts. Une offre qui demande une connexion est mise de côté ; à la fin tu te connectes
-dans ces onglets puis Ctrl+Alt+Droite : elles sont reprises. Aucune page n'est lue, aucune capture n'est prise.
+dans ces onglets puis Ctrl+Alt+Droite : elles sont reprises. L'extension renvoie un rapport par offre (étapes, critères,
+capture de l'onglet dans output/copilot/shots/), sans valeur perso et rien si un mot de passe est visible.
 Le programme local (.\\fill.ps1 install) doit tourner.
 
-Usage : python batch.py [-n 10] [--source lever] [--wait 7]
+Usage : python batch.py [-n 10] [--source lever] [--wait 7]   (offres en attente de apply.ps1)
+        python batch.py --lot | --lot-file <fichier.json> [-n 3] [--skip k] [--debug]   (--source ne s'applique pas à un lot)
 """
 from __future__ import annotations
 
@@ -145,16 +147,19 @@ def debug_block(rep: dict) -> str:
     return "\n".join(out)
 
 
-MAX_SITE_ATTEMPTS = 30  # tentatives de remplissage par site (toutes offres confondues) avant de s'arrêter
+MAX_SITE_ATTEMPTS = 30  # tentatives de remplissage par site et par jour (toutes offres confondues) avant de s'arrêter
 ATTEMPTS = REPO_ROOT / "output" / "copilot" / "attempts.json"
 
 
 def site_attempts(source: str, add: int = 0) -> int:
-    """Compteur persistant des tentatives de remplissage par site (règle des 30)."""
+    """Compteur des tentatives de remplissage du jour par site (règle des 30), remis à zéro chaque jour comme replays.json."""
+    today = time.strftime("%Y-%m-%d")
     try:
         data = json.loads(ATTEMPTS.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         data = {}
+    if data.get("_day") != today:
+        data = {"_day": today}
     data[source] = data.get(source, 0) + add
     if add:
         ATTEMPTS.write_text(json.dumps(data, indent=1), encoding="utf-8")
@@ -234,7 +239,7 @@ def main() -> None:
         else:
             stage_files(offer, staging, cfg["file_name"])
         started = time.time()
-        n_try = site_attempts(entry["source"], 1)
+        site_attempts(entry["source"], 1)
         entry["note"] = run_one(port, "chrome", chrome, profile, apply_url(offer), args.wait)
         entry["login_needed"] = "connexion demandée" in entry["note"]
         rep = fetch_report(port, started)

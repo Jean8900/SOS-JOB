@@ -1,6 +1,6 @@
 """Connecteur Welcome to the Jungle : entreprises suivies + recherche élargie.
 
-Toute la logique de scraping bas niveau reste dans src/scraper.py (inchangé) --
+Toute la logique de scraping bas niveau reste dans src/scraper.py --
 ce module se contente de la convertir en Offer, pour que le reste du pipeline
 ne reparle plus jamais la forme brute WTJ.
 """
@@ -47,8 +47,8 @@ def fetch(max_results: int = 5) -> list[Offer]:
         anchor_config = scraper.get_company_jobs_config(scraper.company_url(anchor_slug, language))
         query = matcher.search_query_from_criteria(criteria)
         broad_hits = scraper.fetch_broad_search_hits(anchor_config, query=query, max_pages=broad_max_pages)
-    except Exception:  # noqa: BLE001 -- une recherche élargie indisponible ne doit pas bloquer les entreprises suivies
-        pass
+    except Exception as exc:  # noqa: BLE001 -- une recherche élargie indisponible ne doit pas bloquer les entreprises suivies
+        print(f"[wtj] recherche élargie : ECHEC -- {exc}")
 
     unique: dict[str, dict] = {}
     for hit in followed_hits + broad_hits:
@@ -63,7 +63,8 @@ def fetch(max_results: int = 5) -> list[Offer]:
             continue
         try:
             job = scraper.fetch_job_detail(company_slug, hit["slug"])
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 -- une offre illisible n'arrête pas les autres
+            print(f"[wtj] {company_slug}/{hit['slug']} : ECHEC -- {exc}")
             continue
         offers.append(_to_offer(job, company_slug))
         if len(offers) >= max_results:

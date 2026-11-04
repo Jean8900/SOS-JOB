@@ -1,7 +1,6 @@
 """Collecte des offres Welcome to the Jungle : liste d'entreprises suivies + recherche élargie.
 
-Basé sur le MVP1 (notebook wtj_offer_reader.ipynb), généralisé pour boucler sur
-plusieurs entreprises et interroger l'index Algolia global sans filtre
+Boucle sur plusieurs entreprises et interroge l'index Algolia global sans filtre
 organisation (recherche élargie par mots-clés).
 """
 from __future__ import annotations
@@ -96,7 +95,9 @@ def _build_algolia_filters(filters: dict) -> str:
     return " AND ".join(parts)
 
 
-def _algolia_search(config: dict, query: str = "", filters: str = "", hits_per_page: int = 100, max_pages: int = 3) -> list[dict]:
+def _algolia_search(config: dict, query: str = "", filters: str = "", hits_per_page: int = 100, max_pages: int | None = 3,
+                    info: dict | None = None) -> list[dict]:
+    """Recherche paginée dans l'index Algolia WTJ. max_pages=None : toutes les pages. `info` reçoit nbHits."""
     app_id = config["algolia_app_id"]
     endpoint = f"https://{app_id.lower()}-dsn.algolia.net/1/indexes/*/queries"
     headers = {
@@ -107,7 +108,7 @@ def _algolia_search(config: dict, query: str = "", filters: str = "", hits_per_p
     }
     hits = []
     page = 0
-    while page < max_pages:
+    while max_pages is None or page < max_pages:
         payload = {"requests": [{
             "indexName": config["algolia_index_name"],
             "params": urlencode({
@@ -119,6 +120,8 @@ def _algolia_search(config: dict, query: str = "", filters: str = "", hits_per_p
         if "hits" not in result:
             raise ScraperError(f"recherche Algolia impossible: {result.get('message', result)}")
         hits.extend(result["hits"])
+        if info is not None:
+            info["nbHits"] = result.get("nbHits", 0)
         page += 1
         if page >= result["nbPages"]:
             break

@@ -22,19 +22,26 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("query", nargs="+", help="un ou plusieurs mots-clés (résultats cumulés)")
     parser.add_argument("-n", type=int, default=10)
+    parser.add_argument("--reset", action="store_true", help="repartir d'un lot vide au lieu de compléter wtj_lot.json")
+    parser.add_argument("--exclude", nargs="*", default=[str(OUT.parent / "wtj_lot_1.json")],
+                        help="lots déjà envoyés : leurs entreprises sont écartées (défaut : le premier lot)")
     args = parser.parse_args()
 
     companies_cfg = config.load_companies()
     anchor = scraper.get_company_jobs_config(scraper.company_url(companies_cfg.get("anchor_company") or companies_cfg["companies"][0], "fr"))
     hits = [h for q in args.query for h in scraper.fetch_broad_search_hits(anchor, query=q, max_pages=10)]
-    previous = OUT.parent / "wtj_lot_1.json"  # premier lot : on n'y repostule pas
     org_of = lambda o: o["url"].split("/companies/")[1].split("/")[0]  # noqa: E731
-    lot = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() and "--reset" not in sys.argv else []  # on complète le lot en cours
-    seen = {org_of(o) for o in lot} | ({org_of(o) for o in json.loads(previous.read_text(encoding="utf-8"))} if previous.exists() else set())
+    lot = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() and not args.reset else []  # on complète le lot en cours
+    seen = {org_of(o) for o in lot}
+    for previous in map(Path, args.exclude):  # lots déjà envoyés : on n'y repostule pas
+        if previous.exists():
+            seen |= {org_of(o) for o in json.loads(previous.read_text(encoding="utf-8"))}
+    # le titre doit contenir tous les mots significatifs d'au moins une requête (« technicien de maintenance » -> technicien + maintenance)
+    wanted = [[w for w in q.lower().split() if len(w) > 3] for q in args.query]
     for hit in hits:
         org = (hit.get("organization") or {}).get("slug")
         title = (hit.get("name") or "").lower()
-        if not org or org in seen or "maintenance" not in title or not any(w in title for w in ("technicien", "technicienne", "tech ")):
+        if not org or org in seen or not any(words and all(w in title for w in words) for words in wanted):
             continue
         try:
             job = scraper.fetch_job_detail(org, hit["slug"])

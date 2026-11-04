@@ -1,10 +1,9 @@
-"""Pré-remplissage des formulaires de candidature (Ctrl+Alt+F du copilot).
+"""Réponses aux formulaires de candidature, rédigées par Claude (`claude -p`) à partir du CV, de la LM de
+l'offre et de input/form_profile.yaml.
 
-Lit les champs de la page ouverte dans le Chrome du copilot (port de débogage,
-via Playwright), fait rédiger les réponses par Claude (`claude -p`) à partir du
-CV, de la LM et des faits de input/copilot.yaml, puis les écrit dans les champs
-vides et les surligne pour la relecture. Ne touche ni aux fichiers à uploader,
-ni aux cases à cocher / boutons radio, ni au bouton d'envoi : l'envoi reste manuel.
+Deux appelants : le programme local fill.py (extension Chrome, Ctrl+Alt+Espace et batch.py) via
+generate_answers / complete_answers / finalize_answers, et le pré-remplissage Playwright du copilot
+(Ctrl+Alt+F, fill_active_page : champs texte, listes et boutons radio). Jamais de clic sur un envoi.
 """
 from __future__ import annotations
 
@@ -95,8 +94,12 @@ MUST_ANSWER = (
     "SECONDE PASSE : ces champs sont OBLIGATOIRES et sont restés vides à la première passe. Chacun DOIT recevoir une vraie réponse : "
     "ni null, ni \".\", ni phrase vide. Question ouverte (motivation, pourquoi nous rejoindre, expérience...) : 3 à 5 phrases sincères "
     "tirées du CV, de la lettre déjà écrite et de l'offre ; sans fait inventé (si le CV ne couvre pas le sujet, dis honnêtement ce qui s'en "
-    "rapproche et la motivation à apprendre). Question à choix (OUI/NON, liste) : choisis l'option la plus honnête d'après le CV et les FAITS PERSO, copiée à l'identique parmi les options ; NON si le CV ne prouve pas l'expérience demandée ; OUI pour la mobilité sur Paris (candidat basé en Île-de-France).\n\n"
+    "rapproche et la motivation à apprendre). Question à choix (OUI/NON, liste) : choisis l'option la plus honnête d'après le CV et les FAITS PERSO, copiée à l'identique parmi les options ; NON si le CV ne prouve pas l'expérience demandée ; OUI pour une mobilité vers la ville de résidence des FAITS PERSO (city).\n\n"
 )
+
+# Libellé d'un champ de localisation (mots entiers : « Ethnicity », « Milieu » ou « Velocity » ne sont pas des villes).
+_LOCATION_LABEL = re.compile(r"\b(location|localisation|city|ville|lieu)\b", re.I)
+_COUNTRY_LABEL = re.compile(r"^\s*(country|pays)\b(?!\s*(code|de naissance|of birth|d'origine))", re.I)
 
 _LETTER_LABEL = re.compile(r"motivation|cover.?letter|lettre|pourquoi (?:vous|nous|tu|souhait\w+).*(?:rejoindre|postul|candidat)|why .*(?:join|apply)", re.I)
 LETTER_MAX_AGE = 3600  # la LM déposée dans le dossier d'upload date de moins d'une heure : c'est celle de l'offre en cours
@@ -181,11 +184,22 @@ CHAMPS DU FORMULAIRE (JSON) :
                             input=prompt, capture_output=True, text=True, timeout=180, encoding="utf-8")
     if result.returncode != 0:
         raise RuntimeError(f"claude -p a échoué (code {result.returncode}) : {result.stderr[-300:]}")
-    start = result.stdout.find("{")
-    if start < 0:
-        raise RuntimeError(f"réponse sans JSON : {result.stdout[-300:]}")
-    answers, _ = json.JSONDecoder().raw_decode(result.stdout[start:])  # premier objet JSON, tolère du texte avant ou après
-    return answers if isinstance(answers, dict) else {}
+    return _first_json_object(result.stdout)
+
+
+def _first_json_object(text: str) -> dict:
+    """Premier objet JSON valide de la réponse : tolère du texte avant ou après, même avec des accolades dans la prose."""
+    decoder = json.JSONDecoder()
+    start = text.find("{")
+    while start >= 0:
+        try:
+            value, _ = decoder.raw_decode(text[start:])
+            if isinstance(value, dict):
+                return value
+        except json.JSONDecodeError:
+            pass
+        start = text.find("{", start + 1)
+    raise RuntimeError(f"réponse sans JSON : {text[-300:]}")
 
 
 _SUGGESTION_JS = """(input) => {
@@ -327,12 +341,13 @@ def complete_answers(offer: Offer, fields: list[dict], answers: dict, cfg: dict,
     for field in fields:
         if letter and field.get("kind") == "textarea" and _empty(answers, field) and _LETTER_LABEL.search(field.get("label", "")):
             answers[field["id"]] = letter
-    for field in fields:  # liste de pays (souvent > 60 options, donc tronquée avant France) : réponse sûre, tirée du profil (Île-de-France)
-        if field.get("kind") in ("combobox", "dropdown", "select") and _empty(answers, field) and re.search(r"^\s*(country|pays)\b", field.get("label", ""), re.I):
-            answers[field["id"]] = "France"
-    city = (config.load_form_profile() or {}).get("city", "")
+    profile = config.load_form_profile() or {}
+    country, city = profile.get("country", ""), profile.get("city", "")
+    for field in fields:  # liste de pays (souvent > 60 options, donc tronquée) : pays du profil (pas pour « Pays de naissance », « Country code »)
+        if country and field.get("kind") in ("combobox", "dropdown", "select") and _empty(answers, field) and _COUNTRY_LABEL.search(field.get("label", "")):
+            answers[field["id"]] = country
     for field in fields:  # champ de localisation à suggestions : ville du profil (la suggestion est choisie par l'extension)
-        if city and field.get("kind") == "combobox" and _empty(answers, field) and re.search(r"(location|localisation|city|ville|lieu)", field.get("label", ""), re.I):
+        if city and field.get("kind") == "combobox" and _empty(answers, field) and _LOCATION_LABEL.search(field.get("label", "")):
             answers[field["id"]] = city
     todo = [f for f in fields if f.get("kind") in ("textarea", "input", "radio", "yesno", "select", "dropdown", "combobox") and _empty(answers, f)
             and (f.get("required") or "*" in f.get("label", ""))]

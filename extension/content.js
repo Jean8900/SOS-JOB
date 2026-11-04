@@ -195,6 +195,9 @@
     el.blur();
   };
 
+  // libellé d'un champ de localisation (mots entiers : « Ethnicity » ou « Velocity » ne sont pas des villes)
+  const LOCATION_LABEL = /\b(location|localisation|city|ville|lieu)\b/i;
+
   async function readOptions(field) {
     const el = find(field);
     if (!el) return [];
@@ -203,8 +206,7 @@
       const options = comboOptions(el).map((o) => o.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 60);
       closeCombo(el);
       await sleep(200);
-      // suggestions asynchrones (localisation) : aucune option tant qu'on n'a rien tapé ; on annonce une saisie libre (la ville est tapée puis la suggestion choisie)
-      if (!options.length && /location|localisation|city|ville|lieu/i.test(field.label || '')) return ['(saisie libre : ville de résidence)'];
+      // suggestions asynchrones (localisation) : aucune option tant qu'on n'a rien tapé ; la ville du profil est ajoutée côté programme local (complete_answers)
       return options;
     }
     el.click();
@@ -304,10 +306,12 @@
       const opt = comboOptions(el).find((o) => o.innerText.replace(/\s+/g, ' ').trim().toLowerCase() === wanted);
       if (!opt) {
         // suggestions asynchrones (localisation) : taper la ville, laisser le site proposer, choisir la première suggestion
-        if (/location|localisation|city|ville|lieu/i.test(field.label || '')) {
-          await typeText(el, wanted.split(',')[0].trim());
+        if (LOCATION_LABEL.test(field.label || '')) {
+          const town = wanted.split(',')[0].trim();
+          await typeText(el, town);
           await sleep(1500);
-          const sug = comboOptions(el)[0];
+          // seulement une suggestion qui contient la ville tapée (jamais « Loading... » ni une autre ville)
+          const sug = comboOptions(el).find((o) => o.innerText.replace(/\s+/g, ' ').trim().toLowerCase().includes(town));
           if (sug) { click(sug); await sleep(250); highlight(comboControl(el)); return true; }
         }
         closeCombo(el); return false;
@@ -328,6 +332,7 @@
   // answers : { id: "valeur" } ; fields : ceux de CE document. Retourne le nombre de champs remplis.
   async function fill(fields, answers) {
     let filled = 0;
+    window.__sosjobFillLog = [];  // trace des choix de CETTE passe (critère trace_choix)
     const typed = [];
     for (const field of fields) {
       const value = answers[field.id];
@@ -346,7 +351,9 @@
         }
         const el = field.kind === 'radio' ? null : find(field);
         if (['radio', 'dropdown', 'combobox', 'yesno'].includes(field.kind)) {
-          { const okc = await fillChoice(field, value); (window.__sosjobFillLog = window.__sosjobFillLog || []).push((field.label || '').slice(0, 14) + (okc ? '=ok' : '=KO')); if (okc) filled++; }
+          const okc = await fillChoice(field, value);
+          window.__sosjobFillLog.push((field.label || '').slice(0, 14) + (okc ? '=ok' : '=KO'));
+          if (okc) filled++;
         } else if (el) {
           el.scrollIntoView({ block: 'center' });
           if (field.kind === 'select') {
@@ -801,7 +808,11 @@
       add('message_perso', ta && lenOf(ta) > 80, lenOf(ta));
       add('envoi_actif', btnOk(/^(je postule|apply to this job)$/i));
     }
-    if (!c.length && !onWtj() && !onApec() && !onHello() && !onFree() && !onCad() && !onSf()) c.push({ k: 'hors_site', ok: true, skip: true, v: 'page finale : ' + location.hostname });
+    // hôte sans parcours dédié : « écarté » seulement s'il n'y a aucun champ à remplir, sinon c'est un échec à diagnostiquer
+    if (!c.length && !onWtj() && !onApec() && !onHello() && !onFree() && !onCad() && !onSf()) {
+      const form = [...document.querySelectorAll('input:not([type=hidden]):not([type=search]), textarea, select')].some(visible);
+      c.push(form ? { k: 'formulaire', ok: false, v: 'hôte sans parcours dédié : ' + location.hostname } : { k: 'hors_site', ok: true, skip: true, v: 'page finale : ' + location.hostname });
+    }
     // questions à choix (radios) : toutes répondues ?
     { const radios = [...document.querySelectorAll('input[type=radio]')].filter((r) => r.name && (visible(r) || visible(r.parentElement)));
       const names = [...new Set(radios.map((r) => r.name))];
@@ -902,7 +913,7 @@
   if (onWk() && window.parent !== window && !window.__sosjobWkTimer) {
     window.__sosjobWkTimer = setInterval(() => { try { window.parent.postMessage({ sosjobWk: wkState() }, '*'); } catch (e) { /* parent injoignable */ } }, 800);
   }
-  if (window.top === window) window.addEventListener('message', (e) => { if (e.data && e.data.sosjobWk) { window.__sosjobWk = e.data.sosjobWk; window.__sosjobWkN = (window.__sosjobWkN || 0) + 1; window.__sosjobWkAt = Date.now(); } });
+  if (window.top === window) window.addEventListener('message', (e) => { if (e.data && e.data.sosjobWk && /^https:\/\/([^/]+\.)?welcomekit\.co$/.test(e.origin)) { window.__sosjobWk = e.data.sosjobWk; window.__sosjobWkN = (window.__sosjobWkN || 0) + 1; window.__sosjobWkAt = Date.now(); } });
 
   window.__sosjob = { siteState, snapshot, scrollToForm, clickEntry, submitReady, setCoverLetter, extract, readOptions, fill, toast, pageContext, stepSig, needsLogin, isReview, clickNext, fileInputs, attachFile };
 })();

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from html import escape
 from pathlib import Path
-from urllib.parse import urlencode
 
 from . import config, scraper
 
@@ -17,33 +16,14 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "output"
 
 def _algolia_search_all(anchor_config: dict, query: str) -> tuple[dict[str, str], int]:
     """Pagine TOUTES les pages de résultats (pas de plafond). Retourne {slug: name} + nb d'offres."""
-    app_id = anchor_config["algolia_app_id"]
-    endpoint = f"https://{app_id.lower()}-dsn.algolia.net/1/indexes/*/queries"
-    headers = {
-        "X-Algolia-Application-Id": app_id,
-        "X-Algolia-API-Key": anchor_config["algolia_api_key"],
-        "Origin": anchor_config["origin"],
-        "Referer": anchor_config["company_jobs_url"],
-    }
+    info: dict = {}
     companies: dict[str, str] = {}
-    page = 0
-    nb_pages = 1
-    total_hits = 0
-    while page < nb_pages:
-        payload = {"requests": [{
-            "indexName": anchor_config["algolia_index_name"],
-            "params": urlencode({"query": query, "hitsPerPage": 100, "page": page}),
-        }]}
-        result = scraper.fetch_json(endpoint, payload, headers)["results"][0]
-        nb_pages = result["nbPages"]
-        total_hits = result["nbHits"]
-        for hit in result["hits"]:
-            org = hit.get("organization") or {}
-            slug, name = org.get("slug"), org.get("name")
-            if slug and name:
-                companies.setdefault(slug, name.strip())
-        page += 1
-    return companies, total_hits
+    for hit in scraper._algolia_search(anchor_config, query=query, max_pages=None, info=info):
+        org = hit.get("organization") or {}
+        slug, name = org.get("slug"), org.get("name")
+        if slug and name:
+            companies.setdefault(slug, name.strip())
+    return companies, info.get("nbHits", 0)
 
 
 def slugify_filename(text: str) -> str:

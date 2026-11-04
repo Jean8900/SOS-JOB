@@ -82,10 +82,6 @@ def statuses() -> dict[str, str]:
     return {k: v["status"] for k, v in _load().items()}
 
 
-def status_of(key: str) -> str:
-    return _load().get(key, {}).get("status", "")
-
-
 def set_status(key: str, status: str) -> None:
     state = _load()
     now = datetime.now(timezone.utc).isoformat()

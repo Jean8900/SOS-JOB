@@ -18,7 +18,6 @@ from . import config, cv_builder, language
 from .offer import Offer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-REFERENCE_TEX = REPO_ROOT / "input" / "CV_originel.tex"
 SIGNATURE_PNG = REPO_ROOT / "input" / "LM" / "Signature.png"
 OUTPUT_TEX_ROOT = REPO_ROOT / "output" / "LM" / "tex"
 OUTPUT_PDF_ROOT = REPO_ROOT / "output" / "LM" / "pdf"
@@ -246,8 +245,10 @@ def lm_text(offer: Offer) -> str | None:
     if len(parts) < 3:
         return None
     body = parts[2].split(r"\vspace{1cm}")[0]
-    # Inverse de cv_builder.escape_latex (séquences longues d'abord, puis les caractères simples).
+    # Inverse de cv_builder.escape_latex (séquences longues d'abord, puis les caractères simples) ; les remplacements
+    # Unicode (\, $\rightarrow$...) redeviennent des caractères lisibles, jamais du LaTeX collé dans un formulaire.
     inverse = {v: k for k, v in cv_builder._LATEX_SPECIAL_CHARS.items()}
+    inverse.update({v: k for k, v in cv_builder._UNICODE_FIXES.items() if v.startswith(("\\", "$"))})  # pas les tirets (« - » reste « - »)
     body = re.sub("|".join(re.escape(s) for s in sorted(inverse, key=len, reverse=True)),
                   lambda m: inverse[m.group(0)], body)
     return re.sub(r"\n{3,}", "\n\n", body).strip() + "\n"
