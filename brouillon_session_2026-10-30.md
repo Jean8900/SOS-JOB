@@ -2,7 +2,7 @@
 
 ## Résumé de la journée
 
-Lots 1 (7 sites) et 1.5 (Greenhouse, Lever, Ashby via entreprises WTJ) testés de bout en bout ; ChooseYourBoss passé en lot 2, aijobs.net mis de côté. Copilot de candidature (`apply.ps1`) : Chrome, dossier d'upload aux noms fixes, tableau de bord HTML, raccourcis Ctrl+Alt. Suivi Excel avec colonne « Mise à jour » fusionnée devant les notes. Cas limites corrigés (formules, liens, état corrompu). Filtres coupés temporairement. 3 commits, rien poussé.
+Lots 1 (7 sites) et 1.5 (Greenhouse, Lever, Ashby via entreprises WTJ) testés de bout en bout ; aijobs.net mis de côté. Copilot de candidature (`apply.ps1`) : Chrome, dossier d'upload aux noms fixes, tableau de bord HTML, raccourcis Ctrl+Alt. Suivi Excel avec colonne « Mise à jour » fusionnée devant les notes. Cas limites corrigés (formules, liens, état corrompu). Filtres coupés temporairement. 3 commits, rien poussé.
 
 ## Perspectives (nouveaux sites, profils AI / forward deployed / agentique)
 

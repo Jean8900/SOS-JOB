@@ -52,7 +52,8 @@ Chaque MVP est utilisable seul. On ne passe au suivant que si le précédent tou
 - [x] Débloquer Station F / Jobs that make sense via navigateur headless (Playwright, `src/connectors/browser.py`) une fois l'extension Claude in Chrome connectée pour l'analyse
 - [x] Lot 1.5 : Lever/Greenhouse/Ashby — `entreprise -> identifiant ATS` découvert automatiquement depuis la liste WTJ (voir [`input/ats_companies.yaml`](input/ats_companies.yaml))
 - [ ] Lot 1.5 (mis de côté, on y reviendra peut-être) aijobs.net/Foorilla : bloqué par une barrière d'inscription (nom d'entreprise tronqué, export réservé aux comptes connectés) depuis la refonte d'octobre 2026 -- pas de piste sans créer de compte
-- [ ] Lot 2 (alertes email) : ChooseYourBoss (bloqué Cloudflare, alerte configurée sur le site, réception par mail), Apec, HelloWork, Cadremploi, talent.io
+- [ ] Lot 2 (alertes email) : Apec, HelloWork, Cadremploi
+- [ ] Cadremploi : créer l'alerte sur le compte Gmail 8888 (mis de côté pour l'instant, 2026-11-04)
 - [ ] Dédoublonnage inter-sources (une même offre peut apparaître sur plusieurs sites)
 - [ ] Notifications programmées (heure fixe) ou instantanées à l'apparition d'une offre
 - [ ] App mobile (ou PWA) pour candidater en un geste depuis le téléphone

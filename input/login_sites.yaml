@@ -25,9 +25,5 @@ sites:
     url: https://www.hellowork.com/fr-fr/
   - name: Cadremploi
     url: https://www.cadremploi.fr/
-  - name: ChooseYourBoss
-    url: https://www.chooseyourboss.com/
-  - name: talent.io
-    url: https://www.talentio.app/
   - name: Station F Jobs
     url: https://jobs.stationf.co/

@@ -52,6 +52,8 @@ Les sites se traitent **l'un après l'autre** : un seul Chrome, un seul focus (l
 7. **Envoi de test (acquis par défaut, un par site)** : sur UNE offre du lot, hors profil, une fois le formulaire complet et vérifié à l'écran, Claude clique à la main le bouton présumé, relève précisément ce qui se passe (message, 2e fenêtre ou non, page de suivi), capture. Noter dans EDGE_CASES.md le libellé, le sélecteur et la conséquence. Le code garde son arrêt avant ce bouton.
 8. **Documenter au fil de l'eau** dans `extension/EDGE_CASES.md`, section du site : parcours, piège, cause, correction, statut (une ligne par piège). Une ligne au README si une commande change. Mettre à jour le brouillon du jour.
 9. **Compte rendu honnête** : x/10 au dernier écran (vus à l'écran, vs seulement dans le journal), bouton qui soumet identifié (oui/non, et ce qu'il a fait), onglets laissés ouverts pour la recette, ce qui n'est pas vérifié, la commande exacte à copier.
+* **IMPORTANT :** MAX retry par site = 30 tentatives de fill (sur une ou plusieurs offres, au total). Si tu trouve pas 10 offres sur le site tu fais avec le nb d'offre que tu as et tu applique la regle du 30. En gros après 30 tentatives de fill sur le site tu passes au site suivant et tu note dans le compte rendu que tu n'as pas pu finir le site. Le but est d'avoir un compte rendu honnête et complet, pas de forcer à 10/10 si c'est impossible.
+
 
 ## Pièges transversaux déjà rencontrés (vérifier d'abord)
 

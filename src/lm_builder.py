@@ -8,6 +8,7 @@ extraits de input/CV_originel.tex -- jamais d'invention.
 """
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -87,6 +88,9 @@ def _find_claude() -> str:
         found = shutil.which(candidate)
         if found:
             return found
+    npm = Path(os.environ.get("APPDATA", "")) / "npm" / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe"
+    if npm.exists():  # installation npm globale hors PATH (programme lancé au démarrage de Windows)
+        return str(npm)
     raise RuntimeError("Claude Code CLI (`claude`) introuvable dans le PATH.")
 
 

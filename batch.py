@@ -145,6 +145,22 @@ def debug_block(rep: dict) -> str:
     return "\n".join(out)
 
 
+MAX_SITE_ATTEMPTS = 30  # tentatives de remplissage par site (toutes offres confondues) avant de s'arrêter
+ATTEMPTS = REPO_ROOT / "output" / "copilot" / "attempts.json"
+
+
+def site_attempts(source: str, add: int = 0) -> int:
+    """Compteur persistant des tentatives de remplissage par site (règle des 30)."""
+    try:
+        data = json.loads(ATTEMPTS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    data[source] = data.get(source, 0) + add
+    if add:
+        ATTEMPTS.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    return data[source]
+
+
 MAX_REPLAYS = 5  # par offre et par jour : certains essais laissent des traces dans le compte du site (un CV de plus sur Free-Work)
 REPLAYS = REPO_ROOT / "output" / "copilot" / "replays.json"
 
@@ -202,6 +218,11 @@ def main() -> None:
     waiting: list[tuple[dict, object]] = []
 
     def process(offer, entry: dict) -> None:
+        if site_attempts(entry["source"]) >= MAX_SITE_ATTEMPTS and not args.force_replay:
+            entry["note"] = f"{MAX_SITE_ATTEMPTS} tentatives atteintes pour {entry['source']} : arrêt (règle des 30)"
+            entry["login_needed"] = False
+            print(f"  [{entry['source']}] {entry['title'][:50]} -> {entry['note']}")
+            return
         if count_replay(entry["url"]) > MAX_REPLAYS and not args.force_replay:
             entry["note"] = f"plafond de {MAX_REPLAYS} passages par jour atteint (--force-replay pour passer outre)"
             entry["login_needed"] = False
@@ -213,6 +234,7 @@ def main() -> None:
         else:
             stage_files(offer, staging, cfg["file_name"])
         started = time.time()
+        n_try = site_attempts(entry["source"], 1)
         entry["note"] = run_one(port, "chrome", chrome, profile, apply_url(offer), args.wait)
         entry["login_needed"] = "connexion demandée" in entry["note"]
         rep = fetch_report(port, started)

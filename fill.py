@@ -58,7 +58,8 @@ def offer_key(url: str) -> str:
     """Clé d'offre lisible : hôte + fin du chemin, sans paramètres ni valeur perso."""
     parts = urlparse(url)
     tail = "-".join(p for p in parts.path.split("/") if p)[-48:]
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", f"{parts.hostname or 'web'}_{tail}")[:90]
+    ident = (parse_qs(parts.query).get("offreId") or [""])[0][-10:]  # identifiant d'offre en paramètre (Cadremploi) : sinon toutes les offres partagent une clé
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", f"{parts.hostname or 'web'}_{tail}_{ident}")[:90]
 
 
 def prune(folder: Path, key: str, suffix: str) -> None:
@@ -234,6 +235,7 @@ def make_handler(cfg: dict, port: int):
                 answers = formfill.generate_answers(offer, fields, cfg, letter=letter)
                 answers = formfill.complete_answers(offer, fields, answers, cfg, letter=letter)
                 final, short = formfill.finalize_answers(fields, answers)
+                log("  champs : " + " | ".join(f"{f.get('kind')}:{(f.get('label') or '')[:24]}{'=ok' if f['id'] in final else '=vide'}" for f in fields))
                 log(f"{len(final)}/{len(fields)} réponse(s) en {time.time() - started:.0f}s pour {formfill.urlparse(payload['url']).hostname}")
                 self._send(200, {"answers": final, "short": short})
             except Exception as exc:  # un échec ne doit jamais arrêter le serveur

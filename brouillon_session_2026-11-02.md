@@ -17,3 +17,14 @@ Restent : Cadremploi (import du CV bloqué), Station F (exploré).
 `.\batch.ps1 --lot -n 3` : tester WTJ
 `.\batch.ps1 --lot-file output\copilot\<site>_lot.json -n 3 --debug` : tester un autre site
 Nouveau site : skill `site-onboarding` (10 offres réelles, boucle essai/correction, section dans `extension/EDGE_CASES.md`).
+
+>>
+.\login.ps1 #--all
+>>
+.\batch.ps1 --lot -n 3                                                    # WTJ (lot de technicien de maintenance)
+>>
+.\batch.ps1 --lot-file output\copilot\apec_lot.json -n 3                  # Apec (génie chimique)
+>>
+.\batch.ps1 --lot-file output\copilot\hellowork_lot.json -n 3             # HelloWork (technicien de maintenance)
+>>
+.\batch.ps1 --lot-file output\copilot\freework_lot.json -n 3 --generate   # Free-Work

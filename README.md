@@ -57,11 +57,12 @@ Station F et Jobs that make sense : `pip install -r requirements.txt` puis, une 
 ### Lot 1.5 : ATS par entreprise
 
 - **Greenhouse / Lever / Ashby** (actifs) : APIs publiques par entreprise, sans clé ni anti-bot. Pas de recherche globale : les entreprises viennent de WTJ (`discovery_queries` dans [`input/ats_companies.yaml`](input/ats_companies.yaml), par défaut « AI Engineer »), puis on teste si leur nom correspond à un board sur l'un des 3 ATS (~20 % retrouvées). Résultat en cache dans `output/ats_cache.json` (1re exécution ~3 min). Max 5 offres par entreprise. Correction manuelle possible via `companies:` dans le même fichier. **Limite** : Greenhouse n'expose pas le type de contrat, déduit du titre. Code commun : [`src/connectors/ats.py`](src/connectors/ats.py).
-- **aijobs.net** (bloqué, mis de côté) : refonte d'octobre 2026, nom d'entreprise tronqué et export réservés aux comptes connectés ; aucun module, `enabled: false` dans `input/sites.yaml`.
 
 ### Lot 2 : alertes email (non codé)
 
-ChooseYourBoss (pare-feu Cloudflare, 403 dès la requête de base), Apec, HelloWork, Cadremploi, talent.io : pas de connecteur de collecte (voir [`TODO.md`](TODO.md)). Pour ces trois sites on a codé à la place la **candidature** (ci-dessous).
+aijobs.net / aijobs.com, Foorilla : utiles pour la collecte (international), à coder ; renvoient vers d'autres sites.
+
+Apec, HelloWork : collecte par les alertes email (Gmail, API lecture seule : liens de suivi décodés, offres mises en lot puis remplies). Cadremploi : alerte à créer (voir [`TODO.md`](TODO.md)). Les 3 sites ont aussi la **candidature** (ci-dessous).
 
 ### Candidature (codé le 2026-11-02)
 
@@ -73,7 +74,7 @@ Niveau « WTJ » : pour chaque offre l'extension ouvre le formulaire, remplit le
 | Apec | relevées depuis ton Chrome (l'API refuse les scripts : 403), `typeCandidature == "EMAIL_ONLY"` | « Postuler » x2 -> « joindre uniquement un CV » -> import, LM ou message au recruteur (`apecNext`) | « Envoyer ma candidature » | ✅ 10 offres |
 | HelloWork | page de recherche | lien « Postuler » -> formulaire, CV importé, message personnalisé (`helloNext`) | bouton noir « Postuler » | ✅ 10 offres |
 | Free-Work | connecteur `free_work.py` / page de recherche | CV adapté mis par défaut, LM en document additionnel, message, questions (`freeNext`) | « Je postule » / « Apply to this job » | ✅ 4 offres internes validées, 1 hors site écartée |
-| Cadremploi | — | formulaire sur la page ; le bouton du CV agit comme un envoi | « Postuler » du formulaire | ⏳ import du CV bloqué |
+| Cadremploi | — | formulaire sur la page ; le bouton du CV agit comme un envoi | « Postuler » du formulaire | ✅ import du CV OK |
 | Station F Jobs | connecteur `station_f.py` | fenêtre « Formulaire de Candidature » (WelcomeKit) explorée | non relevé | ⏳ parcours à coder |
 | Lever, Greenhouse, Ashby | lot 1.5 | remplissage par `Ctrl+Alt+Espace` | — | ✅ champs ; dépôt de CV testé sur Lever et Greenhouse |
 

@@ -38,8 +38,15 @@ _LATEX_SPECIAL_CHARS = {
 }
 
 
+# Caractères Unicode que pdflatex refuse (ex. le signe moins « − » écrit par le modèle) : remplacés, jamais inversés par lm_text.
+_UNICODE_FIXES = {
+    "\u2212": "-", "\u2011": "-", "\u202f": r"\,", "\u2192": r"$\rightarrow$",
+    "\u2248": r"$\approx$", "\u2265": r"$\geq$", "\u2264": r"$\leq$",
+}
+
+
 def escape_latex(text: str) -> str:
-    return "".join(_LATEX_SPECIAL_CHARS.get(ch, ch) for ch in text)
+    return "".join(_LATEX_SPECIAL_CHARS.get(ch) or _UNICODE_FIXES.get(ch, ch) for ch in text)
 
 
 def slugify(text: str) -> str:

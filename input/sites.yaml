@@ -41,6 +41,3 @@ sites:
   - slug: ashby
     name: "Ashby (entreprises WTJ)"
     enabled: true
-  - slug: aijobs_net
-    name: "aijobs.net"
-    enabled: false

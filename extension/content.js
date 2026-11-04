@@ -34,7 +34,7 @@
 
   // Listes « Select... » des frameworks (react-select...) : le vrai <input> fait quelques pixels, n'a souvent pas d'id,
   // et le site vide le texte tapé s'il n'est pas choisi dans la liste : il faut ouvrir la liste et cliquer une option.
-  const PLACEHOLDER = /^(select|choisir|s[ée]lectionn|start typing|commencez|\.\.\.|--)/i;
+  const PLACEHOLDER = /^(search for|select|choisir|s[ée]lectionn|start typing|commencez|\.\.\.|--)/i;
   const isCombo = (el) => el.tagName === 'INPUT' && (el.getAttribute('role') === 'combobox'
     || el.getAttribute('aria-autocomplete') === 'list' || /^(true|listbox)$/.test(el.getAttribute('aria-haspopup') || ''));
   const comboControl = (el) => el.closest('[class*="control"]') || el.parentElement.parentElement;
@@ -66,7 +66,7 @@
       if (isCombo(el)) {
         if (!visible(comboControl(el)) || el.value) return;
         const shown = (comboControl(el).innerText || '').replace(/\s+/g, ' ').trim();
-        if (shown && !PLACEHOLDER.test(shown)) return;  // déjà choisi
+        if (shown && !PLACEHOLDER.test(shown) && !/^(location|localisation|city|ville|country|pays)\s*\*?$/i.test(shown)) return;  // déjà choisi
         const cid = prefix + '-c' + n;
         el.setAttribute('data-sosjob', cid);
         out.push({ id: cid, sel: selOf(el), kind: 'combobox', type: '', label: labelFromAncestors(el),
@@ -203,6 +203,8 @@
       const options = comboOptions(el).map((o) => o.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 60);
       closeCombo(el);
       await sleep(200);
+      // suggestions asynchrones (localisation) : aucune option tant qu'on n'a rien tapé ; on annonce une saisie libre (la ville est tapée puis la suggestion choisie)
+      if (!options.length && /location|localisation|city|ville|lieu/i.test(field.label || '')) return ['(saisie libre : ville de résidence)'];
       return options;
     }
     el.click();
@@ -300,7 +302,16 @@
     if (field.kind === 'combobox') {
       await openCombo(el);
       const opt = comboOptions(el).find((o) => o.innerText.replace(/\s+/g, ' ').trim().toLowerCase() === wanted);
-      if (!opt) { closeCombo(el); return false; }
+      if (!opt) {
+        // suggestions asynchrones (localisation) : taper la ville, laisser le site proposer, choisir la première suggestion
+        if (/location|localisation|city|ville|lieu/i.test(field.label || '')) {
+          await typeText(el, wanted.split(',')[0].trim());
+          await sleep(1500);
+          const sug = comboOptions(el)[0];
+          if (sug) { click(sug); await sleep(250); highlight(comboControl(el)); return true; }
+        }
+        closeCombo(el); return false;
+      }
       click(opt);
       await sleep(200);
       highlight(comboControl(el));
@@ -335,7 +346,7 @@
         }
         const el = field.kind === 'radio' ? null : find(field);
         if (['radio', 'dropdown', 'combobox', 'yesno'].includes(field.kind)) {
-          if (await fillChoice(field, value)) filled++;
+          { const okc = await fillChoice(field, value); (window.__sosjobFillLog = window.__sosjobFillLog || []).push((field.label || '').slice(0, 14) + (okc ? '=ok' : '=KO')); if (okc) filled++; }
         } else if (el) {
           el.scrollIntoView({ block: 'center' });
           if (field.kind === 'select') {
@@ -412,6 +423,8 @@
     if (onApec()) return apecNext();  // Apec : son propre parcours, rien d'autre n'est cliqué
     if (onHello()) return helloNext();  // HelloWork : son propre parcours
     if (onFree()) return freeNext();  // Free-Work : son propre parcours
+    if (onCad()) return cadNext();  // Cadremploi : son propre parcours
+    if (onSf()) return sfNext();  // Station F Jobs : son propre parcours
     for (const b of buttons()) {
       const t = btnText(b);
       if (!NEXT_OK.test(t) || SUBMIT_WORDS.test(t) || b.disabled || b.getAttribute('aria-disabled') === 'true') continue;
@@ -425,6 +438,7 @@
   // Champs « fichier » encore vides (souvent masqués derrière un faux bouton) : CV, lettre ou autre chose.
   const FILE_CV = /r[ée]sum[ée]|\bcv\b|curriculum/i, FILE_LM = /cover|lettre|motivation|\blm\b/i;
   function fileInputs() {
+    if (onCad()) cadClearDefaultLetter();
     if (onFree()) freeLabelMessage();
     if (onApec()) apecNoSave();
     if (onHello()) helloOpenMessage();
@@ -712,9 +726,14 @@
     .map((e) => e.textContent.trim().slice(0, 50));
   function siteState(exp) {
     exp = exp || {};
+    if (onSf() && !exp.late) return sleep(1500).then(() => siteState({ ...exp, late: true }));
     if (pwVisible()) return { site: location.hostname, skipped: 'mot de passe visible' };
     const c = [];
     const add = (k, ok, v) => c.push({ k, ok: !!ok, v: v === undefined ? '' : String(v).slice(0, 60) });
+    if ((onApec() || onHello()) && !document.querySelector('input[type=file], textarea') && [...document.querySelectorAll('a, button')].some((e) => visible(e) && /postuler\s+sur\s+le\s+site\s+(de l.entreprise|du recruteur)/i.test(e.innerText || ''))) {
+      c.push({ k: 'hors_site', ok: true, skip: true, v: 'candidature chez l’employeur' });
+      return { site: location.hostname, criteria: c };
+    }
     const names = pdfNames();
     const btnOk = (re) => { const b = [...document.querySelectorAll('button')].find((x) => re.test(clean(x.innerText))); return !!(b && visible(b) && !b.disabled); };
     if (onWtj()) {
@@ -733,6 +752,40 @@
       add('message_perso', ta && lenOf(ta) > 80 && !/^\s*madame,? monsieur,?\s+suite à votre offre/i.test(ta.value), lenOf(ta));
       const send = document.querySelector('[data-cy="submitButton"]');
       add('envoi_actif', send && visible(send) && !send.disabled);
+    } else if (onCad()) {
+      const form = cadForm();
+      if (!form) {
+        if ([...document.querySelectorAll('a, button')].some((e) => /site de l.entreprise|candidature externe|postuler sur/i.test(e.innerText || ''))) {
+          c.push({ k: 'hors_site', ok: true, skip: true, v: 'candidature chez l’employeur' });
+          return { site: location.hostname, criteria: c };
+        }
+      }
+      const posed = form ? [...form.querySelectorAll('input[type=file]')].map((i) => i.files && i.files[0] && i.files[0].name).filter(Boolean) : [];
+      add('cv_adapte', exp.cv && (posed.includes(exp.cv) || names.includes(exp.cv)), (posed.concat(names)).join(', ') || 'aucun fichier relevé');
+      const ta = form && [...form.querySelectorAll('textarea')].find(visible);
+      add('message_perso', ta && lenOf(ta) > 80, lenOf(ta));
+      const send = form && [...form.querySelectorAll('button[type="submit"]')].find((b) => /^postuler$/i.test(clean(b.innerText)));
+      add('envoi_actif', send && visible(send) && !send.disabled);
+    } else if (onAts()) {
+      if (/^\/jobs\/search/.test(location.pathname) && ![...document.querySelectorAll('button')].some((b) => /submit application/i.test(clean(b.innerText)))) {
+        c.push({ k: 'offre_indisponible', ok: true, skip: true, v: 'la page retombe sur la recherche (offre fermée ou retirée)' });
+        return { site: location.hostname, criteria: c };
+      }
+      // Greenhouse / Lever / Ashby : formulaire d'entreprise (candidature invité ou MyGreenhouse)
+      add('cv_adapte', exp.cv && (names.includes(exp.cv) || [...document.querySelectorAll('input[type=file]')].some((i) => i.files && i.files[0] && i.files[0].name === exp.cv)), names.join(', ').slice(0, 60) || 'aucun fichier relevé');
+      const starred = (e) => /\*\s*$/.test(labelFromAncestors(e) || '') || /\*\s*$/.test(labelOf(e) || '');
+      const req = [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=submit]), textarea, select')].filter((e) => (visible(e) || isCombo(e)) && (e.required || e.getAttribute('aria-required') === 'true' || starred(e)) && !e.value && !(isCombo(e) && (comboControl(e).innerText || '').trim() && !PLACEHOLDER.test((comboControl(e).innerText || '').trim())));
+      { const lab = [...document.querySelectorAll('label, div, span')].find((e) => e.children.length === 0 && /^location\s*\*?$/i.test((e.textContent || '').trim()) && visible(e));
+        if (lab) { const box = lab.closest('div') && lab.closest('div').parentElement; const txt = ((box && box.innerText) || '').replace(/^\s*location\s*\*?/i, '').trim(); const filled = txt.length > 2 && !/^(search for|select)/i.test(txt); add('localisation', filled, filled ? 'renseignée' : 'vide'); } }
+      add('trace_choix', true, (window.__sosjobFillLog || []).join(' ; ').slice(0, 160));
+      add('champs_obligatoires', req.length === 0, req.length + ' vide(s)' + (req.length ? ' : ' + req.slice(0, 4).map((e) => (e.name || e.id || e.getAttribute('aria-label') || '?').slice(0, 16)).join(', ') : ''));
+      const send = [...document.querySelectorAll('button, input[type=submit]')].find((b) => /^(submit application|submit|envoyer ma candidature|apply)$/i.test(clean(b.innerText || b.value || '')) && (b.type === 'submit' || /submit/i.test(clean(b.innerText || b.value || ''))) && visible(b));
+      add('envoi_actif', !!send && !send.disabled, send ? clean(send.innerText || send.value).slice(0, 24) : '');
+    } else if (onSf()) {
+      const apply = [...document.querySelectorAll('a')].find((a) => /^(postuler|apply|apply now)$/i.test(clean(a.innerText)) && visible(a));
+      const wk = window.__sosjobWk;
+      if (!wk && !document.querySelector('iframe[src*="welcomekit"]') && apply) c.push({ k: 'hors_site', ok: true, skip: true, v: 'le lien n’ouvre pas le formulaire WelcomeKit : candidature chez l’employeur' });
+      else (wk || [{ k: 'formulaire', ok: false, v: 'aucun rapport du cadre welcomekit' }]).forEach((x) => c.push(x));
     } else if (onFree()) {
       // offre qui renvoie chez l'employeur : pas de formulaire, « Apply to this job » est un lien -> écartée (pas un échec)
       if (!document.querySelector('textarea[name="job-application-message"]') && [...document.querySelectorAll('a')].some((a) => /^(apply to this job|je postule|postuler)$/i.test(clean(a.innerText)) && visible(a))) {
@@ -748,6 +801,7 @@
       add('message_perso', ta && lenOf(ta) > 80, lenOf(ta));
       add('envoi_actif', btnOk(/^(je postule|apply to this job)$/i));
     }
+    if (!c.length && !onWtj() && !onApec() && !onHello() && !onFree() && !onCad() && !onSf()) c.push({ k: 'hors_site', ok: true, skip: true, v: 'page finale : ' + location.hostname });
     // questions à choix (radios) : toutes répondues ?
     { const radios = [...document.querySelectorAll('input[type=radio]')].filter((r) => r.name && (visible(r) || visible(r.parentElement)));
       const names = [...new Set(radios.map((r) => r.name))];
@@ -769,11 +823,86 @@
   }
   function scrollToForm() {
     if (pwVisible()) return false;
-    const el = document.querySelector('input[name="custom-answer-0"]') || document.querySelector('[role=dialog] button[data-testid="apply-form-submit"], [data-cy="submitButton"], textarea[name="job-application-message"]')
+    const el = (onCad() && cadForm() && (cadForm().querySelector('input[type=file]') || cadForm().querySelector('button[type="submit"]'))) || document.querySelector('input[name="custom-answer-0"]') || document.querySelector('[role=dialog] button[data-testid="apply-form-submit"], [data-cy="submitButton"], textarea[name="job-application-message"]')
       || [...document.querySelectorAll('button')].find((b) => /^envoyer ma candidature$/i.test(clean(b.innerText)));
     if (el) el.scrollIntoView({ block: 'center' });
     return !!el;
   }
+
+  // Cadremploi : formulaire « Envoyez votre candidature ! » sur la page de l'offre (offres « un clic » internes ; les autres renvoient chez l'employeur).
+  // PIÈGE : le bouton qui affiche le CV enregistré n'a pas d'attribut type = bouton submit : un clic provoque une tentative d'envoi.
+  // On le rend inoffensif (type=button) avant tout clic. Jamais de clic sur le « Postuler » du formulaire (type=submit) : il envoie.
+  const onCad = () => /(^|\.)cadremploi\.fr$/.test(location.hostname);
+  const cadForm = () => { const n = document.querySelector('input[name="nom"]'); return n && n.closest('form'); };
+  // Cadremploi préremplit une lettre générique (« ... pour lequel je souhaite vous proposer ma candidature ») : on l'efface pour la remplacer.
+  function cadClearDefaultLetter() {
+    const form = cadForm();
+    for (const t of form ? form.querySelectorAll('textarea') : []) {
+      if (!visible(t) || !/je souhaite vous proposer ma candidature/i.test(t.value)) continue;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, '');
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+      t.setAttribute('data-sosjob-label', 'Lettre de motivation / message au recruteur * (message court de 3 à 5 phrases, quelques centaines de caractères, personnalisé pour cette offre à partir du CV et de la lettre de motivation ; pas de formule générique)');
+    }
+  }
+  function cadNext() {
+    if (!/detail_offre/.test(location.pathname)) return '';
+    const form = cadForm();
+    // le formulaire s'affiche parfois tard : l'attendre avant de conclure qu'il n'y en a pas
+    if (!form) return freeHelpers().waitFor(() => cadForm(), 14000).then((f) => (f ? cadNext() : ''));
+    const root = document.documentElement;
+    // jamais de bouton sans type dans le formulaire : tout bouton non explicitement « submit » devient un simple bouton
+    form.querySelectorAll('button').forEach((b) => { if (!b.hasAttribute('type')) b.setAttribute('type', 'button'); });
+    if (!root.hasAttribute('data-sosjob-cad-cv')) {
+      const cv = [...form.querySelectorAll('button')].find((b) => /\.(pdf|docx?|rtf)\s*$/i.test(clean(b.innerText)));
+      if (cv) { root.setAttribute('data-sosjob-cad-cv', '1'); cv.scrollIntoView({ block: 'center' }); cv.click(); return 'CV : remplacer'; }
+    }
+    if (!root.hasAttribute('data-sosjob-cad-lm')) {
+      const head = [...form.querySelectorAll('span, div')].filter((e) => e.children.length <= 1 && /^personnaliser ma lettre de motivation/i.test(clean(e.textContent)) && (e.textContent || '').length < 60).pop();
+      if (head && ![...form.querySelectorAll('textarea')].some(visible)) { root.setAttribute('data-sosjob-cad-lm', '1'); head.click(); return 'Lettre : déplier'; }
+    }
+    return '';
+  }
+
+  // Station F Jobs (WelcomeKit) : « POSTULER » (lien) ouvre le « Formulaire de Candidature » dans une fenêtre (colorbox, cadre). Jamais de clic sur son bouton d'envoi.
+  const onAts = () => /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com)$/.test(location.hostname);
+  const onSf = () => /(^|\.)jobs\.stationf\.co$/.test(location.hostname);
+  function sfNext() {
+    if (!/\/companies\/[^/]+\/jobs\//.test(location.pathname)) return '';
+    const root = document.documentElement;
+    if (root.hasAttribute('data-sosjob-sf-open')) return '';
+    const a = [...document.querySelectorAll('a')].find((x) => /^(postuler|apply|apply now|apply for this job)$/i.test(clean(x.innerText)) && visible(x));
+    if (!a) return '';
+    root.setAttribute('data-sosjob-sf-open', '1');
+    a.scrollIntoView({ block: 'center' }); a.click(); tickFlow();  // le formulaire s'ouvre dans un cadre : rien ne change dans la page elle-même
+    return 'Postuler (ouvrir le formulaire)';
+  }
+
+  // WelcomeKit (formulaire de Station F, dans un cadre d'un autre domaine) : le cadre publie son état final au parent, que la page ne peut pas lire.
+  // Jamais de valeur perso : booléens, longueurs, noms de fichiers. Le reCAPTCHA du formulaire n'est jamais touché (l'envoi demande l'utilisateur).
+  const onWk = () => /(^|\.)welcomekit\.co$/.test(location.hostname);
+  function wkState() {
+    if (pwVisible()) return [];
+    const c = [];
+    const files = [...document.querySelectorAll('input[type=file]')].map((i) => i.files && i.files[0] && i.files[0].name).filter(Boolean).concat(pdfNames());
+    c.push({ k: 'cv_adapte', ok: files.some((n) => /^cv_/i.test(n)), v: files.join(', ').slice(0, 60) || 'aucun fichier relevé' });
+    const letter = [...document.querySelectorAll('textarea')].filter(visible).sort((a, b) => b.value.length - a.value.length)[0];
+    c.push({ k: 'lettre_perso', ok: !!letter && letter.value.length > 80, v: String(letter ? letter.value.length : 0) });
+    const inputs = [...document.querySelectorAll('input[type=checkbox]')];
+    const roles = [...document.querySelectorAll('[role=checkbox]')];
+    const ticked = inputs.filter((b) => b.checked).length + roles.filter((r) => r.getAttribute('aria-checked') === 'true').length;
+    const total = Math.max(inputs.length, roles.length);
+    if (total) c.push({ k: 'consentement', ok: ticked >= total, v: ticked + '/' + total });
+    const empty = [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=file]):not([type=submit]), select')].filter((e) => visible(e) && !e.value && (e.required || e.getAttribute('aria-required') === 'true'));
+    c.push({ k: 'champs_obligatoires', ok: empty.length === 0, v: empty.length + ' vide(s)' });
+    if (document.querySelector('iframe[src*="recaptcha"], .g-recaptcha')) c.push({ k: 'captcha', ok: true, skip: true, v: 'reCAPTCHA présent : l’envoi demande l’utilisateur' });
+    const send = [...document.querySelectorAll('button, input[type=submit]')].find((b) => /submit|send|envoyer|postuler|apply/i.test(clean(b.innerText || b.value || '')) && visible(b));
+    c.push({ k: 'envoi_visible', ok: !!send && !send.disabled, v: send ? clean(send.innerText || send.value).slice(0, 30) : '' });
+    return c;
+  }
+  if (onWk() && window.parent !== window && !window.__sosjobWkTimer) {
+    window.__sosjobWkTimer = setInterval(() => { try { window.parent.postMessage({ sosjobWk: wkState() }, '*'); } catch (e) { /* parent injoignable */ } }, 800);
+  }
+  if (window.top === window) window.addEventListener('message', (e) => { if (e.data && e.data.sosjobWk) { window.__sosjobWk = e.data.sosjobWk; window.__sosjobWkN = (window.__sosjobWkN || 0) + 1; window.__sosjobWkAt = Date.now(); } });
 
   window.__sosjob = { siteState, snapshot, scrollToForm, clickEntry, submitReady, setCoverLetter, extract, readOptions, fill, toast, pageContext, stepSig, needsLogin, isReview, clickNext, fileInputs, attachFile };
 })();

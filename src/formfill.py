@@ -181,10 +181,10 @@ CHAMPS DU FORMULAIRE (JSON) :
                             input=prompt, capture_output=True, text=True, timeout=180, encoding="utf-8")
     if result.returncode != 0:
         raise RuntimeError(f"claude -p a échoué (code {result.returncode}) : {result.stderr[-300:]}")
-    match = re.search(r"\{.*\}", result.stdout, re.DOTALL)
-    if not match:
+    start = result.stdout.find("{")
+    if start < 0:
         raise RuntimeError(f"réponse sans JSON : {result.stdout[-300:]}")
-    answers = json.loads(match.group(0))
+    answers, _ = json.JSONDecoder().raw_decode(result.stdout[start:])  # premier objet JSON, tolère du texte avant ou après
     return answers if isinstance(answers, dict) else {}
 
 
@@ -327,6 +327,13 @@ def complete_answers(offer: Offer, fields: list[dict], answers: dict, cfg: dict,
     for field in fields:
         if letter and field.get("kind") == "textarea" and _empty(answers, field) and _LETTER_LABEL.search(field.get("label", "")):
             answers[field["id"]] = letter
+    for field in fields:  # liste de pays (souvent > 60 options, donc tronquée avant France) : réponse sûre, tirée du profil (Île-de-France)
+        if field.get("kind") in ("combobox", "dropdown", "select") and _empty(answers, field) and re.search(r"^\s*(country|pays)\b", field.get("label", ""), re.I):
+            answers[field["id"]] = "France"
+    city = (config.load_form_profile() or {}).get("city", "")
+    for field in fields:  # champ de localisation à suggestions : ville du profil (la suggestion est choisie par l'extension)
+        if city and field.get("kind") == "combobox" and _empty(answers, field) and re.search(r"(location|localisation|city|ville|lieu)", field.get("label", ""), re.I):
+            answers[field["id"]] = city
     todo = [f for f in fields if f.get("kind") in ("textarea", "input", "radio", "yesno", "select", "dropdown", "combobox") and _empty(answers, f)
             and (f.get("required") or "*" in f.get("label", ""))]
     if todo:
