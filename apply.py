@@ -7,7 +7,6 @@ toi-même ; rien n'est soumis automatiquement.
 Raccourcis globaux (marchent quelle que soit la fenêtre active) :
   Ctrl+Alt+Droite = candidaté   Ctrl+Alt+Gauche = offre précédente
   Ctrl+Alt+S = passer           Ctrl+Alt+Q = quitter
-  Ctrl+Alt+F = pré-remplir le formulaire de l'onglet actif (relecture puis envoi à ta main)
 Usage : python apply.py
 """
 from __future__ import annotations
@@ -21,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src import applications, config, dashboard, formfill, lm_builder, winlayout  # noqa: E402
+from src import applications, config, dashboard, lm_builder, winlayout  # noqa: E402
 from src.hotkeys import HotkeyListener  # noqa: E402
 from src.offer import Offer  # noqa: E402
 
@@ -92,7 +91,6 @@ class Layout:
         self.dashboard = (x + left_w, y + top_h, w - left_w, h - top_h)
         self.chrome = _find_chrome()
         self.copilot_dir = copilot_dir
-        self.debug_port = int(cfg.get("debug_port", 9222))
         self._browser_hwnd = 0
 
     def open_explorer(self, folder: Path) -> None:
@@ -117,9 +115,8 @@ class Layout:
             return
         if not (self._browser_hwnd and winlayout.is_window(self._browser_hwnd)):
             x, y, w, h = self.browser
-            # Profil dédié + port de débogage : nécessaires au pré-remplissage (Chrome refuse le port sur le profil par défaut).
-            subprocess.Popen([self.chrome, f"--remote-debugging-port={self.debug_port}",
-                              f"--user-data-dir={self.copilot_dir / 'chrome_profile'}",
+            # Profil dédié : les connexions aux sites y sont conservées.
+            subprocess.Popen([self.chrome, f"--user-data-dir={self.copilot_dir / 'chrome_profile'}",
                               "--no-first-run", "--no-default-browser-check",
                               "--new-window", f"--window-position={x},{y}",
                               f"--window-size={w},{h}", url])
@@ -182,15 +179,6 @@ def main() -> None:
             layout.open_offer(apply_url(offer))
             dashboard.write(page, dashboard.render(compute_stats(session, i, warnings + offer_warnings)))
             action = hotkeys.wait()
-            while action == "fill":
-                print("Pré-remplissage en cours...")
-                try:
-                    message = formfill.fill_active_page(offer, cfg)
-                except Exception as exc:  # une erreur de remplissage ne doit jamais arrêter le copilot
-                    message = f"Remplissage échoué : {exc}"
-                print(message)
-                dashboard.write(page, dashboard.render(compute_stats(session, i, warnings + offer_warnings + [message])))
-                action = hotkeys.wait()
             if action == "right":
                 applications.set_status(key, applications.APPLIED)
                 i += 1

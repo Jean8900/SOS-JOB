@@ -1,15 +1,13 @@
 """Réponses aux formulaires de candidature, rédigées par Claude (`claude -p`) à partir du CV, de la LM de
 l'offre et de input/form_profile.yaml.
 
-Deux appelants : le programme local fill.py (extension Chrome, Ctrl+Alt+Espace et batch.py) via
-generate_answers / complete_answers / finalize_answers, et le pré-remplissage Playwright du copilot
-(Ctrl+Alt+F, fill_active_page : champs texte, listes et boutons radio). Jamais de clic sur un envoi.
+Appelant : le programme local fill.py (extension Chrome, Ctrl+Alt+Espace et batch.py) via
+generate_answers / complete_answers / finalize_answers. Jamais de clic sur un envoi.
 """
 from __future__ import annotations
 
 import datetime
 import json
-import random
 import re
 import time
 from pathlib import Path
@@ -18,77 +16,6 @@ from urllib.parse import urlparse
 
 from . import config, language, lm_builder
 from .offer import Offer
-
-# Marque chaque champ vide et visible d'un attribut data-sosjob pour le retrouver au remplissage.
-_EXTRACT_JS = r"""(prefix) => {
-  const out = [];
-  const selOf = (el) => {
-    const q = (v) => String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    if (el.id) return '[id="' + q(el.id) + '"]';
-    if (el.name && el.type === 'radio') return 'input[name="' + q(el.name) + '"][value="' + q(el.value) + '"]';
-    if (el.name) return el.tagName.toLowerCase() + '[name="' + q(el.name) + '"]';
-    return null;
-  };
-  const label = (el) => {
-    const bits = [];
-    if (el.getAttribute('aria-label')) bits.push(el.getAttribute('aria-label'));
-    const by = el.getAttribute('aria-labelledby');
-    if (by) by.split(/\s+/).forEach(i => { const n = document.getElementById(i); if (n) bits.push(n.innerText); });
-    if (el.id) document.querySelectorAll('label[for="' + CSS.escape(el.id) + '"]').forEach(l => bits.push(l.innerText));
-    const wrap = el.closest('label'); if (wrap) bits.push(wrap.innerText);
-    if (!bits.length) { const p = el.closest('div,fieldset,li'); if (p) bits.push(p.innerText.slice(0, 200)); }
-    if (el.placeholder) bits.push(el.placeholder);
-    return bits.join(' | ').replace(/\s+/g, ' ').trim().slice(0, 300);
-  };
-  document.querySelectorAll('input, textarea, select').forEach((el, n) => {
-    const type = (el.type || '').toLowerCase();
-    if (['hidden','file','submit','button','reset','image','password','checkbox','radio'].includes(type)) return;
-    if (el.disabled || el.readOnly) return;
-    if (/^(rechercher|search)/i.test(el.placeholder || '')) return;  // champ de recherche interne d'une liste
-    const r = el.getBoundingClientRect(), st = getComputedStyle(el);
-    if (r.width < 5 || r.height < 5 || st.visibility === 'hidden' || st.display === 'none') return;
-    const isSelect = el.tagName === 'SELECT';
-    if (!isSelect && el.value) return;
-    if (isSelect && el.selectedIndex > 0) return;
-    const id = prefix + '-' + n;
-    el.setAttribute('data-sosjob', id);
-    out.push({id, sel: selOf(el), kind: isSelect ? 'select' : (el.tagName === 'TEXTAREA' ? 'textarea' : 'input'), type,
-              label: label(el), min_chars: el.minLength > 0 ? el.minLength : undefined,
-              max_chars: el.maxLength > 0 ? el.maxLength : undefined, required: el.required || el.getAttribute('aria-required') === 'true',
-              options: isSelect ? [...el.options].map(o => o.text.trim()).filter(Boolean) : undefined});
-  });
-  const seen = new Set();
-  document.querySelectorAll('input[type=radio]').forEach((el, n) => {
-    if (!el.name || seen.has(el.name)) return;
-    seen.add(el.name);
-    const group = [...document.querySelectorAll('input[type=radio]')].filter(r => r.name === el.name);
-    if (group.some(r => r.checked)) return;  // déjà choisi
-    const box = el.closest('fieldset, [role=radiogroup], [role=group]') || el.parentElement.parentElement;
-    const rb = box.getBoundingClientRect();
-    if (rb.width < 5 || rb.height < 5) return;
-    const opts = group.map(r => {
-      const l = r.id && document.querySelector('label[for="' + CSS.escape(r.id) + '"]');
-      const w = r.closest('label');
-      return ((l && l.innerText) || (w && w.innerText) || r.value || '').replace(/\s+/g, ' ').trim();
-    });
-    let q = (box.innerText || '').replace(/\s+/g, ' ').trim();
-    opts.forEach(o => { if (o) q = q.replace(o, ''); });
-    const id = prefix + '-r' + n;
-    group.forEach((r, k) => r.setAttribute('data-sosjob', id + '-' + k));
-    out.push({id, sels: group.map(selOf), kind: 'radio', type: 'radio', label: q.trim().slice(0, 300), required: false, options: opts});
-  });
-  document.querySelectorAll('button[aria-haspopup=listbox]').forEach((el, n) => {
-    const txt = (el.innerText || '').replace(/\s+/g, ' ').trim();
-    if (!/s[ée]lectionn|select|choisi|choose/i.test(txt)) return;  // seulement les listes encore vides
-    if (el.closest('header, nav, [role=banner]') || el.disabled) return;
-    const r = el.getBoundingClientRect();
-    if (r.width < 5 || r.height < 5) return;
-    const id = prefix + '-d' + n;
-    el.setAttribute('data-sosjob', id);
-    out.push({id, sel: selOf(el), kind: 'dropdown', type: '', label: (el.getAttribute('aria-label') || txt).slice(0, 300), required: false});
-  });
-  return out;
-}"""
 
 MUST_ANSWER = (
     "SECONDE PASSE : ces champs sont OBLIGATOIRES et sont restés vides à la première passe. Chacun DOIT recevoir une vraie réponse : "
@@ -202,119 +129,6 @@ def _first_json_object(text: str) -> dict:
     raise RuntimeError(f"réponse sans JSON : {text[-300:]}")
 
 
-_SUGGESTION_JS = """(input) => {
-  const r = input.getBoundingClientRect(), full = input.value.trim().toLowerCase();
-  const v = full.split(',')[0].trim();
-  if (!v) return false;
-  const tokens = full.split(/[\\s,]+/).filter(t => t.length >= 3);
-  const overlay = (e) => { for (; e && e !== document.body; e = e.parentElement) {
-    const pos = getComputedStyle(e).position; if (pos === 'absolute' || pos === 'fixed') return true; } return false; };
-  document.querySelectorAll('[data-sosjob-sug]').forEach(e => e.removeAttribute('data-sosjob-sug'));
-  const all = [...document.querySelectorAll('body *')].filter(e => {
-    if (e === input || e.contains(input) || input.contains(e) || e.children.length > 3) return false;
-    const b = e.getBoundingClientRect();
-    if (b.width < 20 || b.height < 10 || b.top < r.bottom - 4 || b.top > r.bottom + 400) return false;
-    const t = (e.innerText || '').trim().toLowerCase();
-    return t.length < 120 && t.startsWith(v) && overlay(e);
-  });
-  const hits = all.filter(h => !all.some(o => o !== h && h.contains(o)));  // éléments les plus profonds : une suggestion, pas toute la liste
-  // la suggestion qui ressemble le plus à la valeur voulue, à égalité la plus haute dans la liste
-  const score = (e) => tokens.filter(t => e.innerText.toLowerCase().includes(t)).length;
-  hits.sort((a, b) => score(b) - score(a) || a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-  if (hits[0]) hits[0].setAttribute('data-sosjob-sug', '1');
-  return hits.length > 0;
-}"""
-
-
-def _retype_with_suggestion(frame, loc, value: str) -> None:
-    """Champ à auto-complétion (ville, entreprise...) que le site vide s'il n'a pas été choisi dans sa liste :
-    frappe réelle, puis clic sur la première suggestion qui commence par le texte tapé."""
-    loc.fill("")
-    loc.press_sequentially(value, delay=60)
-    frame.page.wait_for_timeout(1200)
-    if loc.evaluate(_SUGGESTION_JS):
-        frame.locator("[data-sosjob-sug]").first.click(timeout=2000)
-
-
-def _loc(frame, field: dict, k: int | None = None):
-    """Le champ vivant dans la page : sélecteur stable (id/name) d'abord, puis l'attribut posé à l'extraction."""
-    if k is not None:
-        sels = field.get("sels") or []
-        sel = sels[k] if k < len(sels) else None
-        return frame.locator(sel).first if sel else frame.locator(f'[data-sosjob="{field["id"]}-{k}"]').first
-    sel = field.get("sel")
-    return frame.locator(sel).first if sel else frame.locator(f'[data-sosjob="{field["id"]}"]').first
-
-
-def _read_dropdown_options(frame, loc) -> list[str]:
-    """Ouvre la liste déroulante, lit ses options visibles, la referme."""
-    try:
-        loc.click(timeout=2000)
-        frame.page.wait_for_timeout(600)
-        options = frame.evaluate("""() => [...document.querySelectorAll('[role=option]')]
-            .filter(e => e.getBoundingClientRect().width > 0).map(e => e.innerText.replace(/\\s+/g, ' ').trim()).filter(t => t && !/^s[ée]lectionnez/i.test(t))""")
-        frame.page.keyboard.press("Escape")
-        frame.page.wait_for_timeout(200)
-        return options
-    except Exception:
-        return []
-
-
-def _fill_choice(frame, field: dict, value: str) -> bool:
-    """Bouton radio ou liste déroulante : choisit l'option dont le texte correspond à `value`."""
-    wanted = value.strip().lower()
-    if field["kind"] == "radio":
-        for k, option in enumerate(field["options"]):
-            if option.strip().lower() == wanted:
-                radio = _loc(frame, field, k)
-                try:
-                    radio.check(force=True, timeout=2000)
-                except Exception:
-                    radio.evaluate("e => e.click()")
-                radio.evaluate("e => { const t = e.closest('label') || e.parentElement; t.style.outline = '3px solid #f5a623'; }")
-                return True
-        return False
-    loc = _loc(frame, field)
-    loc.click(timeout=2000)
-    frame.page.wait_for_timeout(500)
-    for option in frame.get_by_role("option").all():
-        if option.is_visible() and option.inner_text().strip().lower() == wanted:
-            option.click(timeout=2000)
-            loc.evaluate("e => { e.style.outline = '3px solid #f5a623'; }")
-            return True
-    frame.page.keyboard.press("Escape")
-    return False
-
-
-def _active_page(browser):
-    pages = [p for ctx in browser.contexts for p in ctx.pages if p.url.startswith(("http://", "https://"))]
-    for page in reversed(pages):
-        try:
-            if page.evaluate("document.visibilityState") == "visible":
-                return page
-        except Exception:
-            continue
-    return pages[-1] if pages else None
-
-
-_TOAST_JS = """([text, ms]) => {
-  let t = document.getElementById('sosjob-toast');
-  if (!t) { t = document.createElement('div'); t.id = 'sosjob-toast';
-    t.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:360px;padding:10px 14px;'
-      + 'background:#1e325a;color:#fff;font:14px system-ui,sans-serif;border-radius:8px;box-shadow:0 2px 12px #0006';
-    document.documentElement.appendChild(t); }
-  t.textContent = text; clearTimeout(window.__sosjobToast);
-  if (ms) window.__sosjobToast = setTimeout(() => t.remove(), ms);
-}"""
-
-
-def _toast(page, text: str, ms: int = 0) -> None:
-    try:
-        page.evaluate(_TOAST_JS, [text, ms])
-    except Exception:
-        pass  # page en navigation : le message reste affiché dans le terminal
-
-
 def offer_from_context(url: str, title: str, text: str) -> Offer:
     """Contexte d'un site quelconque (hors file du copilot) : titre, domaine et texte visible de la page."""
     host = urlparse(url).hostname or "web"
@@ -375,98 +189,3 @@ def finalize_answers(fields: list[dict], answers: dict) -> tuple[dict, list[str]
             short.append(field["label"][:40])
         final[field["id"]] = value
     return final, short
-
-
-def _offer_from_page(page) -> Offer:
-    """Contexte d'un site quelconque (hors file du copilot) : titre, domaine et texte visible de la page."""
-    try:
-        text = page.evaluate("document.body.innerText")[:3000]
-    except Exception:
-        text = ""
-    return offer_from_context(page.url, page.title(), text)
-
-
-def fill_active_page(offer: Offer | None, cfg: dict) -> str:
-    """Remplit le formulaire de l'onglet actif. `offer` = None : n'importe quel site (contexte tiré de la page).
-    Retourne un message d'état pour le tableau de bord / le terminal."""
-    from playwright.sync_api import sync_playwright
-
-    port = int(cfg.get("debug_port", 9222))
-    with sync_playwright() as pw:
-        try:
-            browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-        except Exception as exc:
-            return f"Remplissage impossible : Chrome du copilot injoignable ({type(exc).__name__})"
-        page = _active_page(browser)
-        if page is None:
-            return "Remplissage impossible : aucun onglet web ouvert"
-        if is_excluded(page.url, cfg):
-            return f"Remplissage désactivé sur {urlparse(page.url).hostname} (conditions d'utilisation)"
-        if offer is None:
-            offer = _offer_from_page(page)
-        _toast(page, "SOS-JOB : lecture du formulaire et rédaction des réponses...")
-        fields: list[tuple] = []
-        for i, frame in enumerate(page.frames):
-            try:
-                fields += [(frame, f) for f in frame.evaluate(_EXTRACT_JS, str(i))]
-            except Exception:
-                continue  # iframe détachée ou inaccessible
-        if not fields:
-            _toast(page, "SOS-JOB : aucun champ vide à remplir sur cette page", 5000)
-            return "Aucun champ vide à remplir sur cette page"
-        for frame, field in list(fields):  # les options d'une liste déroulante ne se lisent qu'en l'ouvrant
-            if field["kind"] == "dropdown":
-                field["options"] = _read_dropdown_options(frame, _loc(frame, field))
-                if not field["options"]:
-                    fields.remove((frame, field))
-        answers = generate_answers(offer, [f for _, f in fields], cfg)
-        filled, short, filled_inputs = 0, [], []
-        for frame, field in fields:
-            value = answers.get(field["id"])
-            if not isinstance(value, str) or not value.strip():
-                continue
-            if field["kind"] in ("radio", "dropdown"):
-                try:
-                    filled += _fill_choice(frame, field, value)
-                    page.wait_for_timeout(random.randint(150, 400))
-                except Exception:
-                    pass
-                continue
-            lo, hi = _limits(field)
-            value = clamp(value, lo, hi)
-            if lo and len(value) < lo:
-                short.append(field["label"][:40])
-            loc = _loc(frame, field)
-            try:
-                loc.scroll_into_view_if_needed(timeout=2000)
-                if field["kind"] == "select":
-                    loc.select_option(label=value, timeout=2000)
-                else:
-                    loc.fill(value.strip(), timeout=3000)  # déclenche les événements input/change comme une saisie
-                    if field["kind"] == "input":
-                        filled_inputs.append((frame, field, value.strip()))
-                loc.evaluate("e => { e.style.outline = '3px solid #f5a623'; e.style.outlineOffset = '1px'; }")
-                filled += 1
-                if field["kind"] == "input":
-                    try:  # liste d'auto-complétion ouverte : choisir la 1re suggestion (non bloquant)
-                        page.wait_for_timeout(900)
-                        if loc.evaluate(_SUGGESTION_JS):
-                            frame.locator("[data-sosjob-sug]").first.click(timeout=2000)
-                    except Exception:
-                        pass
-                page.wait_for_timeout(random.randint(150, 400))
-            except Exception:
-                continue
-        for frame, field, value in filled_inputs:  # le site a-t-il vidé le champ (auto-complétion) ?
-            loc = _loc(frame, field)
-            try:
-                if not loc.input_value():
-                    _retype_with_suggestion(frame, loc, value)
-                    if not loc.input_value():
-                        filled -= 1
-            except Exception:
-                filled -= 1
-        note = f" ; trop court (min non atteint) : {', '.join(short)}" if short else ""
-        message = f"{filled} champ(s) pré-rempli(s) sur {len(fields)} (surlignés en orange){note} -- relis avant d'envoyer"
-        _toast(page, "SOS-JOB : " + message, 9000)
-        return message

@@ -15,7 +15,7 @@ kernel32 = ctypes.windll.kernel32
 _MOD_ALT, _MOD_CONTROL, _MOD_NOREPEAT = 0x0001, 0x0002, 0x4000
 _WM_HOTKEY, _WM_QUIT = 0x0312, 0x0012
 
-KEYS = {"right": 0x27, "left": 0x25, "skip": 0x53, "quit": 0x51, "fill": 0x46}  # flèche droite/gauche, S, Q, F
+KEYS = {"right": 0x27, "left": 0x25, "skip": 0x53, "quit": 0x51}  # flèche droite/gauche, S, Q
 
 
 class HotkeyListener:
