@@ -45,8 +45,11 @@ def fetch(max_results: int = 5) -> list[Offer]:
     broad_hits: list[dict] = []
     try:
         anchor_config = scraper.get_company_jobs_config(scraper.company_url(anchor_slug, language))
-        query = matcher.search_query_from_criteria(criteria)
-        broad_hits = scraper.fetch_broad_search_hits(anchor_config, query=query, max_pages=broad_max_pages)
+        # WTJ ne garde que les offres qui contiennent tous les mots d'une requête : une requête par métier, puis fusion.
+        extra = " ".join([*(criteria.get("stack") or []), criteria.get("search_query_extra") or ""]).strip()
+        queries = [" ".join(filter(None, [p, extra])) for p in criteria.get("professions") or []] or [matcher.search_query_from_criteria(criteria)]
+        for query in queries:
+            broad_hits += scraper.fetch_broad_search_hits(anchor_config, query=query, max_pages=broad_max_pages)
     except Exception as exc:  # noqa: BLE001 -- une recherche élargie indisponible ne doit pas bloquer les entreprises suivies
         print(f"[wtj] recherche élargie : ECHEC -- {exc}")
 

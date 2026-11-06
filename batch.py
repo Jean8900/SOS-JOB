@@ -147,12 +147,17 @@ def debug_block(rep: dict) -> str:
     return "\n".join(out)
 
 
-MAX_SITE_ATTEMPTS = 30  # tentatives de remplissage par site et par jour (toutes offres confondues) avant de s'arrêter
+MAX_SITE_ATTEMPTS = 30  # tentatives de remplissage par site et par run de go (toutes offres confondues) avant de s'arrêter
 ATTEMPTS = REPO_ROOT / "output" / "copilot" / "attempts.json"
 
 
+def reset_attempts() -> None:
+    """Remet le compteur à zéro : appelé au démarrage de chaque run de go.py."""
+    ATTEMPTS.unlink(missing_ok=True)
+
+
 def site_attempts(source: str, add: int = 0) -> int:
-    """Compteur des tentatives de remplissage du jour par site (règle des 30), remis à zéro chaque jour comme replays.json."""
+    """Compteur des tentatives de remplissage par site pour le run en cours (règle des 30), remis à zéro par reset_attempts()."""
     today = time.strftime("%Y-%m-%d")
     try:
         data = json.loads(ATTEMPTS.read_text(encoding="utf-8"))
