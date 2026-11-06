@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import alertes  # noqa: E402
 from apply import _find_chrome, apply_url  # noqa: E402
-from batch import LOGIN_SITES, call, ensure_pdfs, fill_offer, open_in_chrome  # noqa: E402
+from batch import LOGIN_SITES, call, ensure_pdfs, fill_offer, open_in_chrome, reset_attempts  # noqa: E402
 from src import applications, config, gmail, matcher, winlayout  # noqa: E402
 from src.recorder import PausableRecorder, find_ffmpeg  # noqa: E402
 from src.offer import Offer  # noqa: E402
@@ -354,8 +354,10 @@ def save_form(form: dict) -> None:
 def apply_criteria(form: dict) -> None:
     def year(value):
         return _count(value) if value not in (None, "") else None
-    # La pile technique n'est pas dans le formulaire : elle n'écarte rien ici (lieux et contrats restent ceux de criteria.yaml, affichés).
-    config.set_criteria_override({"disable_filters": not form.get("filter"), "stack": [], "integrated_apply_only": True, "professions": [p for p in form.get("professions", []) if p.strip()],
+    # La pile technique n'est pas dans le formulaire : elle n'écarte rien ici. Lieux et contrats non plus : le formulaire ne les
+    # propose pas, donc go ne garde que les critères qu'il affiche (ceux de criteria.yaml ne s'appliquent pas à un go).
+    config.set_criteria_override({"disable_filters": not form.get("filter"), "stack": [], "locations": [], "contract_types": [],
+                                  "integrated_apply_only": True, "professions": [p for p in form.get("professions", []) if p.strip()],
                                   "years_min": year(form.get("years_min")), "years_max": year(form.get("years_max"))})
 
 
@@ -384,6 +386,7 @@ def start(form: dict) -> dict:
             return {"ok": False, "error": "Déjà en cours."}
         state.update(phase="running", log=[], error="", done="", video="", percent=0, fill_percent=0, gen_msg="", fill_msg="")
     apply_criteria(form)
+    reset_attempts()  # la règle des 30 tentatives s'applique par run
     progress.clear()
     progress.update({s["slug"]: {"target": s["n"], "generated": 0, "attempted": 0} for s in plan})
     threading.Thread(target=run, args=(plan,), daemon=True).start()
