@@ -32,8 +32,10 @@ stack:
   - LLM
   - PyTorch
 
-# Mots-clés séniorité (cherchés dans le titre + la description). Vide = peu importe.
-seniority: []
+# Années d'expérience voulues (plage comparée à celle demandée par l'offre, null = pas de borne).
+# Une offre qui n'indique rien est gardée.
+years_min: null
+years_max: null
 
 # Texte additionnel injecté dans la recherche élargie Algolia (relevance full-text),
 # en plus de "professions" + "stack". Laisse vide si tu ne veux rien ajouter.

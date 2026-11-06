@@ -18,8 +18,17 @@ def _load(filename: str) -> dict:
         return yaml.safe_load(f)
 
 
+_criteria_override: dict = {}
+
+
+def set_criteria_override(values: dict) -> None:
+    """Critères du formulaire de go.py : priment sur criteria.yaml le temps du processus, sans réécrire le fichier."""
+    _criteria_override.clear()
+    _criteria_override.update(values)
+
+
 def load_criteria() -> dict:
-    return _load("criteria.yaml")
+    return {**_load("criteria.yaml"), **_criteria_override}
 
 
 def load_companies() -> dict:

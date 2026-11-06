@@ -9,6 +9,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Iterator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -16,6 +17,40 @@ from src import config, cv_builder, lm_builder, scraper  # noqa: E402
 from src.connectors.welcome_to_the_jungle import _to_offer  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "output" / "copilot" / "wtj_lot.json"
+
+
+def org_of(entry: dict) -> str:
+    return entry["url"].split("/companies/")[1].split("/")[0]
+
+
+def iter_offers(queries: list[str], seen: set[str], generate: bool = True, log=print) -> Iterator[tuple[object, dict]]:
+    """Offres WTJ à candidature intégrée dont le titre contient les mots d'une requête, une par entreprise
+    (les entreprises de `seen` sont écartées, `seen` est complété au fil de l'eau), CV et LM générés.
+    Rend (offer, entrée de lot) ; une offre ratée est ignorée sans arrêter le reste."""
+    companies_cfg = config.load_companies()
+    anchor = scraper.get_company_jobs_config(scraper.company_url(companies_cfg.get("anchor_company") or companies_cfg["companies"][0], "fr"))
+    hits = [h for q in queries for h in scraper.fetch_broad_search_hits(anchor, query=q, max_pages=10)]
+    # le titre doit contenir tous les mots significatifs d'au moins une requête (« technicien de maintenance » -> technicien + maintenance)
+    wanted = [[w for w in q.lower().split() if len(w) > 3] for q in queries]
+    for hit in hits:
+        org = (hit.get("organization") or {}).get("slug")
+        title = (hit.get("name") or "").lower()
+        if not org or org in seen or not any(words and all(w in title for w in words) for words in wanted):
+            continue
+        try:
+            job = scraper.fetch_job_detail(org, hit["slug"])
+            if job.get("ats") != "wkit":  # candidature intégrée à WTJ (les autres renvoient vers le site de l'employeur)
+                continue
+            offer = _to_offer(job, org)
+            if generate:
+                cv_builder.generate_cv_for_job(offer)
+                lm_builder.generate_lm_for_job(offer)
+        except Exception as exc:  # noqa: BLE001 -- une offre ratée n'arrête pas le lot
+            log(f"  ignorée ({org}) : {exc}")
+            continue
+        seen.add(org)
+        yield offer, {"company": offer.company, "title": offer.title, "url": offer.url, "source": offer.source,
+                      "source_id": offer.source_id, "location": offer.location}
 
 
 def main() -> None:
@@ -27,39 +62,19 @@ def main() -> None:
                         help="lots déjà envoyés : leurs entreprises sont écartées (défaut : le premier lot)")
     args = parser.parse_args()
 
-    companies_cfg = config.load_companies()
-    anchor = scraper.get_company_jobs_config(scraper.company_url(companies_cfg.get("anchor_company") or companies_cfg["companies"][0], "fr"))
-    hits = [h for q in args.query for h in scraper.fetch_broad_search_hits(anchor, query=q, max_pages=10)]
-    org_of = lambda o: o["url"].split("/companies/")[1].split("/")[0]  # noqa: E731
     lot = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() and not args.reset else []  # on complète le lot en cours
     seen = {org_of(o) for o in lot}
     for previous in map(Path, args.exclude):  # lots déjà envoyés : on n'y repostule pas
         if previous.exists():
             seen |= {org_of(o) for o in json.loads(previous.read_text(encoding="utf-8"))}
-    # le titre doit contenir tous les mots significatifs d'au moins une requête (« technicien de maintenance » -> technicien + maintenance)
-    wanted = [[w for w in q.lower().split() if len(w) > 3] for q in args.query]
-    for hit in hits:
-        org = (hit.get("organization") or {}).get("slug")
-        title = (hit.get("name") or "").lower()
-        if not org or org in seen or not any(words and all(w in title for w in words) for words in wanted):
-            continue
-        try:
-            job = scraper.fetch_job_detail(org, hit["slug"])
-            if job.get("ats") != "wkit":  # candidature intégrée à WTJ (les autres renvoient vers le site de l'employeur)
-                continue
-            offer = _to_offer(job, org)
-            cv_builder.generate_cv_for_job(offer)
-            lm_builder.generate_lm_for_job(offer)
-        except Exception as exc:  # noqa: BLE001 -- une offre ratée n'arrête pas le lot
-            print(f"  ignorée ({org}) : {exc}")
-            continue
-        seen.add(org)
-        lot.append({"company": offer.company, "title": offer.title, "url": offer.url, "source": offer.source,
-                    "source_id": offer.source_id, "location": offer.location})
-        print(f"  {len(lot)}/{args.n} {offer.company} : {offer.title}")
-        OUT.write_text(json.dumps(lot, ensure_ascii=False, indent=1), encoding="utf-8")
-        if len(lot) >= args.n:
-            break
+    if len(lot) < args.n:
+        for offer, entry in iter_offers(args.query, seen):
+            lot.append(entry)
+            print(f"  {len(lot)}/{args.n} {offer.company} : {offer.title}")
+            OUT.write_text(json.dumps(lot, ensure_ascii=False, indent=1), encoding="utf-8")
+            if len(lot) >= args.n:
+                break
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(lot, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{len(lot)} offre(s) -> {OUT}")
 

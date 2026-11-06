@@ -108,7 +108,8 @@ CHAMPS DU FORMULAIRE (JSON) :
 
 {MUST_ANSWER if must_answer else ""}Réponds UNIQUEMENT par un objet JSON {{"<id du champ>": "<valeur>" ou null, ...}}, un id par champ, sans texte autour."""
     result = subprocess.run([lm_builder._find_claude(), "-p", "--permission-mode", "dontAsk", "--model", "sonnet", "--restricted"],
-                            input=prompt, capture_output=True, text=True, timeout=180, encoding="utf-8")
+                            input=prompt, capture_output=True, text=True, timeout=180, encoding="utf-8",
+                            creationflags=subprocess.CREATE_NO_WINDOW)  # sans console : fill.py tourne sans fenêtre, et une console volerait le focus à Chrome
     if result.returncode != 0:
         raise RuntimeError(f"claude -p a échoué (code {result.returncode}) : {result.stderr[-300:]}")
     return _first_json_object(result.stdout)

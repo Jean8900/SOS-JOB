@@ -2,7 +2,7 @@
 
 Sources lues : [`README.md`](README.md), [`TODO.md`](TODO.md), [`extension/EDGE_CASES.md`](extension/EDGE_CASES.md), brouillons de session ([30/10](brouillon_session_2026-10-30.md), [02/11](brouillon_session_2026-11-02.md), [03/11](brouillon_session_2026-11-03.md), [04/11](brouillon_session_2026-11-04.md)), `git log`, le code de [`src/`](src), [`extension/`](extension) et des points d'entrée.
 
-Sommaire : [A. Abandonné](#a-fonctionnalités-abandonnées) · [B. Incohérences métier](#b1-tableau-métier) · [B. Incohérences techniques](#b2-tableau-technique) · [C. Plan de la phase II](#c-ce-que-la-phase-ii-va-modifier)
+Sommaire : [A. Abandonné](#a-fonctionnalités-abandonnées) · [B. Incohérences métier](#b1-tableau-métier) · [B. Incohérences techniques](#b2-tableau-technique) · [C. Plan de la phase II](#c-ce-que-la-phase-ii-va-modifier) · [D. Notions à l'abandon (transcripts)](#d-notions-potentiellement-à-labandon-lecture-des-transcripts)
 
 ## A. Fonctionnalités abandonnées
 
@@ -103,3 +103,57 @@ Colonne « Fait autrement » : **v** = le besoin métier est couvert par un autr
 8. [wtj_prepare.py](wtj_prepare.py) : filtre de titre tiré des mots de la requête (plus « maintenance » en dur) ; lot précédent passé en option.
 9. [Connecteur WTJ](src/connectors/welcome_to_the_jungle.py) : erreurs loguées au lieu d'être avalées ; [company_finder](src/company_finder.py) réutilise la recherche de `scraper`.
 10. Nettoyage : `REFERENCE_TEX` et `status_of` morts, notebook MVP1 supprimé, docstrings périmées, ancre WTJ sur une entreprise suivie.
+
+## D. Notions potentiellement à l'abandon (lecture des transcripts)
+
+Source : les sessions réelles du projet (`~/.claude/projects/C--Users-jeanm-SOS-JOB/*.jsonl`), soit 235 messages humains. Les ~480 appels automatiques `claude -p` (LM, formulaires) sont exclus. Rien de ce qui figure déjà en [A](#a-fonctionnalités-abandonnées) ou [B](#b-incohérences-redondances-divergences) n'est repris. Chaque passe a un angle différent : **[remplacé]** = on a trouvé mieux, **[silence]** = c'était très attendu au début, puis on n'en a plus parlé.
+
+### D.v1 — Messages humains : ce qui a été remplacé par mieux
+
+- **[remplacé] Cockpit apply.ps1** : 3 fenêtres + swipe Ctrl+Alt ←/→/S/Q ([hotkeys](src/hotkeys.py), [winlayout](src/winlayout.py)). Supplanté par batch.py ; Ctrl+Alt+→ survit dans login/batch.
+- **[remplacé] Tableau de bord HTML** (quart bas droit, [dashboard.py](src/dashboard.py) en `--app`) : tu ne l'as plus cité après le 30/10 ; le rapport ✓/✗ par offre de batch.py le remplace.
+- **[remplacé] Ctrl+Alt+Entrée multi-étapes** : 2e raccourci prévu le 02/11 pour enchaîner les écrans, fusionné dans un seul Ctrl+Alt+Espace (boucle de [background.js](extension/background.js), 8 étapes).
+- **[remplacé] Chrome de test / profil dédié** : Chromium isolé ([run_case.py](extension/test/run_case.py)) et `chrome_profile`. Abandonnés le 02/11 au profit de ta vraie session Chrome (cookies, connexions).
+- **[remplacé] Mots de passe en secret** (nano, Bitwarden relié à l'extension, idée du 02/11) : remplacés par le gestionnaire de Chrome + [login.ps1](login.py) ; l'IA ne voit aucun identifiant.
+- **[remplacé] LM par API Sonnet/Haiku + cache + Batch** (~4 $/mois, 26/10) : remplacées par `claude -p` sur l'abonnement Pro, prompt par stdin ([lm_builder](src/lm_builder.py)), zéro coût API.
+- **[remplacé] Candidature envoyée de bout en bout** : le 02/11, « faut vraiment candidater » sur 10 offres. Recadré en arrêt avant l'envoi + 1 envoi de test manuel par site.
+- **[remplacé] Remplissage générique de tout ATS** (10 sites variés, Workday multi-pages) : jugé « trop complexe » le 02/11 → parcours codés site par site (`onWtj`, `apecNext`…).
+
+### D.v2 — Premiers jours : ce qui était très attendu puis abandonné en silence (pourquoi)
+
+- **[silence] Apprentissage de style des LM** (cas 1 relecture / cas 2 historique) : au cœur du brief du 26/10, jamais codé. Pourquoi : le goulot est devenu le formulaire, pas la LM.
+- **[silence] Carte de France des offres** (MVP3, géocodage) : « on skip pour l'instant » le 26/10, plus jamais cité. Pourquoi : du reporting pur, aucun gain pour candidater.
+- **[silence] App mobile / notifications** (MVP5) : vision du 26/10, puis plus rien. Pourquoi : le pilotage de Claude Code à distance depuis le téléphone couvre déjà le besoin « candidater de loin ».
+- **[silence] SQLite + interface web** (MVP4) : prévus pour l'historique, jamais rouverts. Pourquoi : `applications.json` + `suivi.xlsx` suffisent pour quelques dizaines d'offres.
+- **[silence] TUI à cases à cocher** ([ui.py](src/ui.py), textual) : la star du MVP1, dernier mot de toi le 28/10. Pourquoi : on ne choisit plus dans une liste, on prépare des lots par mot-clé.
+- **[silence] Suffixe `sites` de run.ps1** (liste à cocher des sources) : décidé le 28/10, puis oublié. Pourquoi : run.ps1 lui-même n'est plus lancé depuis le 30/10 (cap « candidater »).
+- **[silence] companies.ps1** (page HTML des entreprises par métier) : « laissons tomber les dev » dès le 28/10 ; ne sert plus qu'en coulisse à la découverte ATS (lot 1.5).
+- **[silence] Archive des LM** ([archive_lm](archive_lm.py), suffixe `force`) : dernière mention le 28/10. Les lots génèrent CV et LM à la volée et ne passent jamais par l'archive.
+
+### D.v3 — Transcripts croisés avec le code : branchements morts
+
+- **[silence] Suivi Excel alimenté par les lots** : batch.py n'appelle jamais `applications.set_status`, donc tes candidatures en lot ne vont pas dans suivi.xlsx. Le suivi est figé sur apply.ps1.
+- **[silence] Support Edge** : l'extension et fill.py gèrent Chrome et Edge, mais [batch.py](batch.py) a « chrome » en dur ; aucun lot n'a été lancé sur Edge depuis le 03/11.
+- **[silence] Sources sans parcours de candidature** : Inria, CNRS, Choisir le service public. Collecte OK, aucun formulaire codé, plus citées par toi après le 30/10. Utiles pour le profil IA ?
+- **[silence] Jobs that make sense** : « enlève ce site inutile » le 02/11 (tournée de connexion), mais le connecteur reste `enabled: true` dans [sites.yaml](input/sites.yaml).
+- **[remplacé] Découverte ATS via WTJ** (lot 1.5, ~20 % de boards retrouvés, cache) : pour candidater, remplacée le 03/11 par la recherche my.greenhouse.io, sans passer par le nom d'entreprise.
+- **[silence] Lever et Ashby en candidature** : la collecte marche, mais il n'y a pas d'espace candidat (03/11) ; jamais passés par site-onboarding, seul Greenhouse a atteint le niveau WTJ.
+- **[remplacé] Lot tiré des offres en attente** (`batch.py` sans `--lot`, `pick()`) : depuis le 02/11, tout passe par `--lot` / `--lot-file` ; le mélange de sources via applications.json ne sert plus.
+
+### D.v4 — Perspectives du 30/10 jamais reprises
+
+- **[silence] Profil cible AI engineer** : tous les lots réels visent technicien / génie chimique (offres de test hors profil). Le pipeline n'a jamais tourné sur ton vrai métier.
+- **[silence] Labs IA dans ats_companies.yaml** (Anthropic, Mistral, Hugging Face…) : quick win « sans code » du 30/10, jamais fait ; `companies: []` est toujours vide.
+- **[silence] VIE, Remotive, RemoteOK, We Work Remotely** : sources « peu de code » listées le 30/10, une seule mention. Pourquoi : le cap « candidater » du 03/11 a gelé la collecte.
+- **[silence] Connecteurs Workday / SmartRecruiters / Workable** (grands groupes) : listés le 30/10. SmartRecruiters bloque les robots, et Workday n'apparaît plus que dans la tournée de connexion.
+- **[silence] Relance J+7 et réponses via Gmail** dans le suivi : TODO depuis le 30/10. L'accès Gmail existe (alertes) mais n'a jamais été branché sur suivi.xlsx.
+- **[silence] Dédoublonnage inter-sources** (TODO MVP5) : sans objet tant que chaque lot vient d'une seule source ; redeviendra utile si run.ps1 multi-sites reprend.
+- **[silence] Lieux étrangers + header du CV trop long** : TODO international du 30/10, jamais traité ; la détection FR/EN marche, mais `locations` reste Paris/Lyon/Remote.
+
+### D.v5 — Outillage et méthode autour du code
+
+- **[silence] OpenRouter multi-modèles** (notebook sandbox, 28/10) : comparer 20 modèles, audit de sécurité. Une journée puis plus rien : pour un usage intensif, Claude Code Pro reste moins cher.
+- **[remplacé] Arbre des features** (skill en 3 MVP, 03/11) : jamais codé ; ce diagnostic.md tient le rôle (abandons, divergences), sans skill ni commit automatique.
+- **[remplacé] Lot 2 intégré à run.ps1** (30/10) : un LLM devait lire les alertes, les filtrer par critères puis générer CV et LM. C'est devenu un décodage ponctuel de liens (Apec base64, HelloWork 302).
+- **[silence] Notebooks comme banc d'essai** (sandbox, nbconvert, cité par .clinerules) : les essais passent désormais par l'extension et le vrai Chrome ; seul gmail_test.ipynb sert encore.
+- **[remplacé] Brouillons de session quotidiens** : 4 fichiers à la racine, souvent refondus (README refait 4 fois le 02-03/11) ; le savoir durable vit dans EDGE_CASES.md et les skills.

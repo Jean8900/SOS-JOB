@@ -30,7 +30,6 @@ Chaque MVP est utilisable seul. On ne passe au suivant que si le précédent tou
 - [x] Tournée de connexion (`.\login.ps1`) : sites dans `input/login_sites.yaml`, état dans `output/logins.json`
 - [ ] Commande « ouvrir l'offre dans ton Chrome connecté » (étape 2 : le seul geste humain devient l'upload, le captcha éventuel et l'envoi)
 - [ ] Vision « mode comptes guidé » : une commande qui ouvre un à un les sites où il faut un compte, préremplit l'e-mail et les champs non secrets, laisse le gestionnaire de mots de passe générer et enregistrer le mot de passe (l'utilisateur ne le voit ni ne le tape), attend un raccourci « fait » et passe au site suivant ; l'IA n'y touche jamais aux identifiants. Pas de création de comptes 100 % automatique : e-mail de vérification, captchas et conditions d'utilisation des sites l'empêchent.
-- [ ] `apply.ps1` (Ctrl+Alt+F, Playwright) et l'extension dupliquent la lecture des champs (`src/formfill.py` / `extension/content.js`) : n'en garder qu'une
 
 ## International / langues
 - [x] Détection fr/en de l'offre (comptage de mots-outils) -> CV et LM dans la langue de l'offre

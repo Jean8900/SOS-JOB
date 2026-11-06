@@ -24,3 +24,11 @@ fill_excluded_domains:
 
 # Tes infos perso pour les formulaires (adresse, salaire, préavis...) : input/form_profile.yaml
 # (local, ignoré par git, jamais dans le CV ni la LM). Modèle : input/form_profile.example.yaml.
+
+# Formulaire .\go.ps1 : port local, mails d'alerte lus (jours), et marge de collecte
+# (offres collectées = demandées x marge, pour en garder assez après le filtre).
+go_port: 47322
+go_alert_days: 3
+go_collect_factor: 4
+# Images par seconde de la vidéo de .\go.ps1 --record.
+go_video_fps: 15

@@ -184,6 +184,33 @@ def count_replay(url: str) -> int:
     return data[url]
 
 
+def fill_offer(offer, entry: dict, port: int, chrome: str, profile: str, staging: Path, file_name: str,
+               wait: float = 7.0, force_replay: bool = False, no_files: bool = False) -> dict | None:
+    """Remplit une offre dans un nouvel onglet (plafonds, CV/LM, ordre à l'extension). Renseigne entry (note, login_needed,
+    criteria, ran) et renvoie le rapport de l'extension."""
+    entry["login_needed"] = False
+    entry["ran"] = False
+    if site_attempts(entry["source"]) >= MAX_SITE_ATTEMPTS and not force_replay:
+        entry["note"] = f"{MAX_SITE_ATTEMPTS} tentatives atteintes pour {entry['source']} : arrêt (règle des 30)"
+        return None
+    if count_replay(entry["url"]) > MAX_REPLAYS and not force_replay:
+        entry["note"] = f"plafond de {MAX_REPLAYS} passages par jour atteint (--force-replay pour passer outre)"
+        return None
+    if no_files:
+        for f in staging.glob("*"):
+            f.unlink(missing_ok=True)
+    else:
+        stage_files(offer, staging, file_name)
+    started = time.time()
+    site_attempts(entry["source"], 1)
+    entry["note"] = run_one(port, "chrome", chrome, profile, apply_url(offer), wait)
+    entry["ran"] = True
+    entry["login_needed"] = "connexion demandée" in entry["note"]
+    rep = fetch_report(port, started)
+    entry["criteria"] = [{"k": c["k"], "ok": c["ok"]} for c in ((rep or {}).get("state") or {}).get("criteria", [])]
+    return rep
+
+
 def save(report: list[dict]) -> None:
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -223,27 +250,7 @@ def main() -> None:
     waiting: list[tuple[dict, object]] = []
 
     def process(offer, entry: dict) -> None:
-        if site_attempts(entry["source"]) >= MAX_SITE_ATTEMPTS and not args.force_replay:
-            entry["note"] = f"{MAX_SITE_ATTEMPTS} tentatives atteintes pour {entry['source']} : arrêt (règle des 30)"
-            entry["login_needed"] = False
-            print(f"  [{entry['source']}] {entry['title'][:50]} -> {entry['note']}")
-            return
-        if count_replay(entry["url"]) > MAX_REPLAYS and not args.force_replay:
-            entry["note"] = f"plafond de {MAX_REPLAYS} passages par jour atteint (--force-replay pour passer outre)"
-            entry["login_needed"] = False
-            print(f"  [{entry['source']}] {entry['title'][:50]} -> {entry['note']}")
-            return
-        if args.no_files:
-            for f in staging.glob("*"):
-                f.unlink(missing_ok=True)
-        else:
-            stage_files(offer, staging, cfg["file_name"])
-        started = time.time()
-        site_attempts(entry["source"], 1)
-        entry["note"] = run_one(port, "chrome", chrome, profile, apply_url(offer), args.wait)
-        entry["login_needed"] = "connexion demandée" in entry["note"]
-        rep = fetch_report(port, started)
-        entry["criteria"] = [{"k": c["k"], "ok": c["ok"]} for c in ((rep or {}).get("state") or {}).get("criteria", [])]
+        rep = fill_offer(offer, entry, port, chrome, profile, staging, cfg["file_name"], args.wait, args.force_replay, args.no_files)
         print(f"  [{entry['source']}] {entry['title'][:50]} -> {entry['note']}")
         if rep and criteria_line(rep):
             print(f"      {criteria_line(rep)}")

@@ -14,12 +14,15 @@ sites:
   - slug: welcome_to_the_jungle
     name: "Welcome to the Jungle"
     enabled: true
+    login_url: https://www.welcometothejungle.com/fr/authenticate/signin
   - slug: free_work
     name: "Free-Work"
     enabled: true
+    login_url: https://www.free-work.com/fr
   - slug: station_f
     name: "Station F"
     enabled: true
+    login_url: https://jobs.stationf.co/
   - slug: choisir_service_public
     name: "Choisir le service public"
     enabled: true
@@ -41,3 +44,11 @@ sites:
   - slug: ashby
     name: "Ashby (entreprises WTJ)"
     enabled: true
+
+# `login_url` ci-dessus : page ouverte par .\go.ps1 avant de candidater (sans login_url : aucune connexion demandée).
+# Sites lus dans les alertes email (alertes.py), proposés par .\go.ps1 avec le nombre d'offres reçues.
+mail_sites:
+  - slug: apec
+    name: "Apec"
+  - slug: hellowork
+    name: "HelloWork"

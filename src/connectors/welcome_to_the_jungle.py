@@ -57,7 +57,11 @@ def fetch(max_results: int = 5) -> list[Offer]:
             unique.setdefault(slug, hit)
 
     offers: list[Offer] = []
-    for hit in list(unique.values())[: max_results * 3]:
+    # Les entreprises suivies arrivent en tête par centaines : on lit d'abord les offres dont le titre vise un métier cherché.
+    keywords = [p.lower() for p in criteria.get("professions") or []]
+    ranked = sorted(unique.values(), key=lambda h: not any(k in (h.get("name") or "").lower() for k in keywords))
+    integrated_only = criteria.get("integrated_apply_only")  # go.py : seules ces offres ont un formulaire sur WTJ, les autres renvoient chez l'employeur
+    for hit in ranked[: max_results * (8 if integrated_only else 3)]:
         company_slug = hit.get("_source_company_slug") or (hit.get("organization") or {}).get("slug")
         if not company_slug:
             continue
@@ -65,6 +69,8 @@ def fetch(max_results: int = 5) -> list[Offer]:
             job = scraper.fetch_job_detail(company_slug, hit["slug"])
         except Exception as exc:  # noqa: BLE001 -- une offre illisible n'arrête pas les autres
             print(f"[wtj] {company_slug}/{hit['slug']} : ECHEC -- {exc}")
+            continue
+        if integrated_only and job.get("ats") != "wkit":
             continue
         offers.append(_to_offer(job, company_slug))
         if len(offers) >= max_results:

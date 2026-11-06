@@ -166,8 +166,12 @@
   const click = (el) => {
     ['mousedown', 'mouseup', 'click'].forEach((t) => el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })));
   };
+  // Dans une fenêtre modale, un Échap qui remonte ferme la fenêtre entière (WTJ, « Lieu de résidence actuel ») : il reste sur le champ.
+  const inModal = (el) => !!(el && el.closest && el.closest('[role=dialog],[aria-modal=true]'));
   const escape = () => {
-    [document.activeElement, document].forEach((t) => t && t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true })));
+    const active = document.activeElement;
+    if (inModal(active)) { active.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' })); return; }
+    [active, document].forEach((t) => t && t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true })));
   };
   const highlight = (el) => { el.style.outline = '3px solid #f5a623'; el.style.outlineOffset = '1px'; };
   // Options de la liste ouverte par ce bouton : la liste visible la plus proche juste sous lui
@@ -191,7 +195,7 @@
     }
   }
   const closeCombo = (el) => {
-    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: !inModal(el) }));
     el.blur();
   };
 
@@ -483,7 +487,7 @@
 
   // Welcome to the Jungle : la candidature s'ouvre dans une fenêtre sur la page de l'offre.
   const onWtj = () => /(^|\.)welcometothejungle\.com$/.test(location.hostname);
-  const wtjForm = () => document.querySelector('[aria-modal] input[name="firstname"], [role=dialog] input[name="firstname"]');
+  const wtjForm = () => [...document.querySelectorAll('input[name="firstname"]')].find(visible);  // sans dépendre de la fenêtre : WTJ a changé sa structure (11/2026)
   // Bouton d'entrée « Postuler » de la page de l'offre (ouvre le formulaire, n'envoie rien).
   function clickEntry() {
     if (!onWtj() || wtjForm()) return false;
@@ -492,11 +496,11 @@
     b.click();
     return true;
   }
-  // Le formulaire WTJ est prêt à être envoyé : le bouton « J'envoie ma candidature ! » est là. On ne le clique JAMAIS :
+  // Le formulaire WTJ est prêt à être envoyé : le bouton d'envoi (« J'envoie ma candidature ! » puis « Envoyer ma candidature ») est là. On ne le clique JAMAIS :
   // sur WTJ il envoie réellement la candidature (vérifié par l'utilisateur). On s'arrête juste avant.
   function submitReady() {
-    const b = document.querySelector('[role=dialog] button[data-testid="apply-form-submit"], [aria-modal] button[data-testid="apply-form-submit"]');
-    return !!(onWtj() && b && visible(b));
+    if (!onWtj()) return false;
+    return [...document.querySelectorAll('button')].some((b) => visible(b) && (b.getAttribute('data-testid') === 'apply-form-submit' || /^(j['’]envoie|envoyer) ma candidature/i.test(clean(b.innerText))));
   }
   // Lettre de motivation : le texte de la LM générée (pas une réponse improvisée) dans le champ « lettre ».
   function setCoverLetter(text) {
@@ -744,7 +748,7 @@
     const names = pdfNames();
     const btnOk = (re) => { const b = [...document.querySelectorAll('button')].find((x) => re.test(clean(x.innerText))); return !!(b && visible(b) && !b.disabled); };
     if (onWtj()) {
-      const ta = document.querySelector('[role=dialog] textarea[name="cover_letter"]');
+      const ta = document.querySelector('textarea[name="cover_letter"], textarea[name="coverLetter"]');
       add('message_lettre', lenOf(ta) > 80, lenOf(ta));
       add('envoi_visible', submitReady());
     } else if (onApec()) {

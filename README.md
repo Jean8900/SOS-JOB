@@ -7,6 +7,8 @@ Customable script to help you to knowning the trend of job market and candidate 
 # Collecte, filtre, génération
 .\companies.ps1                # liste des entreprises par métier (ouvre un .html)
 .\companies.ps1 "AI Engineer"  # métier au choix
+.\go.ps1                       # formulaire : critères, sites, nb d'offres -> connexion -> CV/LM + remplissage de bout en bout (envoi à ta main)
+.\go.ps1 --record              # pareil, et filme l'écran du lancement au message de fin (output\demo\<horodatage>\go.mp4 ; exemple : docs/demo/go_demo.mp4)
 .\run.ps1                      # tous les sites actifs -> filtre -> TUI -> génère CV + LM
 .\run.ps1 sites                # liste à cocher pour choisir les sites à interroger
 .\run.ps1 all                  # pas de TUI, prend toutes les offres filtrées
@@ -25,11 +27,16 @@ Customable script to help you to knowning the trend of job market and candidate 
 .\batch.ps1 --lot -n 3                                                # ouvre et remplit les 3 premières offres du lot WTJ
 .\batch.ps1 --lot-file output\copilot\<site>_lot.json -n 3 --debug    # autre site : apec_lot.json, hellowork_lot.json, freework_lot.json
 #   options : --generate (CV/LM manquants) · --skip k · --no-files (sans CV ni LM, pour déboguer les champs) · --wait s · --force-replay (plafond de 5 passages par offre et par jour) · --source
+
+# Alertes email et démo
+.\.venv\Scripts\python.exe alertes.py                         # mails d'alerte Apec + HelloWork (Gmail, lecture seule) -> output\copilot\alertes_lot.json, à remplir avec batch.ps1 --lot-file
+.\demo.ps1                                                      # démo filmée + TNR : alertes, 3 offres WTJ « Software Engineer » (CV/LM, remplissage, jamais d'envoi), diaporama, verdict -> output\demo\<date>\demo.mp4 + rapport.md
+.\demo.ps1 --no-video                                           # TNR seul (code de sortie 0 = vert)
 ```
 
 Raccourcis globaux (marchent quelle que soit la fenêtre active) :
 - `Ctrl+Alt+Espace` : remplit le formulaire de l'onglet actif dans Chrome ou Edge (extension + programme local).
-- copilot (`apply.ps1`) : `Ctrl+Alt+→` candidaté, `Ctrl+Alt+←` précédente, `Ctrl+Alt+S` passer, `Ctrl+Alt+Q` quitter, `Ctrl+Alt+F` pré-remplit le formulaire (Playwright).
+- copilot (`apply.ps1`) : `Ctrl+Alt+→` candidaté, `Ctrl+Alt+←` précédente, `Ctrl+Alt+S` passer, `Ctrl+Alt+Q` quitter.
 - tournée de connexion (`login.ps1`) : `Ctrl+Alt+→` connecté, `Ctrl+Alt+S` passer, `Ctrl+Alt+←` précédent, `Ctrl+Alt+Q` quitter.
 
 Prérequis des lots : `.\fill.ps1 install`, l'extension chargée dans Chrome, tes sessions ouvertes (`.\login.ps1`) ; ne touche ni clavier ni souris pendant un lot (l'extension n'agit que sur l'onglet actif de la fenêtre au premier plan). Un nouveau site se développe avec le skill `site-onboarding` (10 offres réelles, boucle essai / correction), puis se teste avec la même commande `.\batch.ps1 --lot-file ...`. Banc d'essai isolé : `python extension\test\run_case.py <url>` (Chromium de test, jamais ta session).
@@ -58,7 +65,7 @@ Station F et Jobs that make sense : `pip install -r requirements.txt` puis, une 
 
 - **Greenhouse / Lever / Ashby** (actifs) : APIs publiques par entreprise, sans clé ni anti-bot. Pas de recherche globale : les entreprises viennent de WTJ (`discovery_queries` dans [`input/ats_companies.yaml`](input/ats_companies.yaml), par défaut « AI Engineer »), puis on teste si leur nom correspond à un board sur l'un des 3 ATS (~20 % retrouvées). Résultat en cache dans `output/ats_cache.json` (1re exécution ~3 min). Max 5 offres par entreprise. Correction manuelle possible via `companies:` dans le même fichier. **Limite** : Greenhouse n'expose pas le type de contrat, déduit du titre. Code commun : [`src/connectors/ats.py`](src/connectors/ats.py).
 
-### Lot 2 : alertes email (non codé)
+### Lot 2 : alertes email (`alertes.py`)
 
 aijobs.net / aijobs.com, Foorilla : utiles pour la collecte (international), à coder ; renvoient vers d'autres sites.
 
@@ -111,7 +118,6 @@ Langue : chaque offre est classée français / anglais par un comptage de mots-o
 
 **Copilot (`apply.ps1`)**
 - Chrome sur l'offre (moitié gauche), Explorateur sur le dossier d'upload (quart haut droit, `CV_` / `LM_<nom>.pdf` écrasés à chaque offre), tableau de bord HTML d'avancement (quart bas droit). Passer à l'offre suivante recharge l'onglet actif. Statuts dans `output/applications.json` (suivi, pas de doublon) ; `suivi.ps1` en tire `output/suivi.xlsx`. L'exclusion d'employeur (Illuin) s'applique même sans filtres.
-- `Ctrl+Alt+F` : remplissage Playwright (profil Chrome dédié `output/copilot/chrome_profile`), jamais d'envoi ; la lecture des champs est dupliquée avec l'extension (à unifier, voir `TODO.md`).
 
 **Tournée de connexion (`login.ps1`)** : ouvre un à un les sites de `login_sites.yaml` dans ton Chrome ; tu te connectes toi-même (le gestionnaire de mots de passe remplit) et Chrome garde la session des semaines. Le programme ne lit pas les pages, ne prend aucune capture et ne voit aucun identifiant.
 

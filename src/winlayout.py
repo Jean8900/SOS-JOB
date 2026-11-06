@@ -153,3 +153,22 @@ def window_process_name(hwnd: int) -> str:
         return ""
     finally:
         ctypes.windll.kernel32.CloseHandle(handle)
+
+
+def process_window(process: str) -> int | None:
+    """Première fenêtre principale visible et titrée d'un processus (ex. « code.exe »)."""
+    found: list[int] = []
+
+    def visit(hwnd, _):
+        if user32.IsWindowVisible(hwnd) and window_title(hwnd) and window_process_name(hwnd) == process:
+            found.append(hwnd)
+        return True
+    user32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)(visit), 0)
+    return found[0] if found else None
+
+
+def bring_to_front(hwnd: int) -> None:
+    """Windows n'accepte le changement de premier plan que juste après une touche : Alt pressé puis relâché."""
+    user32.keybd_event(0x12, 0, 0, 0)
+    user32.SetForegroundWindow(hwnd)
+    user32.keybd_event(0x12, 0, 2, 0)

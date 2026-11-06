@@ -126,7 +126,7 @@ Réponds EXACTEMENT dans ce format, rien d'autre avant/après/entre les deux blo
          "--permission-mode", "dontAsk",
          "--model", "sonnet",
          "--restricted"],
-        input=prompt, capture_output=True, text=True, timeout=120, encoding="utf-8",
+        input=prompt, capture_output=True, text=True, timeout=120, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW,
     )
     if result.returncode != 0:
         raise RuntimeError(f"claude -p a échoué (code {result.returncode}):\n{result.stderr[-1000:]}")

@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 STATE_PATH = REPO_ROOT / "output" / "applications.json"
 
 PENDING, APPLIED, SKIPPED = "pending", "applied", "skipped"
+FILLED = "filled"  # formulaire rempli par go.py, envoi à la main : ne revient plus dans les lots
 
 
 def offer_key(offer: Offer) -> str:

@@ -75,7 +75,7 @@ async function fillAllSteps() {
       if (await call(tabId, 0, () => window.__sosjob.isReview(), [])) { end('review', 'étape de révision : relis et envoie toi-même'); break; }
 
       // Welcome to the Jungle : formulaire rempli. L'envoi reste à l'utilisateur (le bouton envoie vraiment la candidature).
-      if (await call(tabId, 0, () => window.__sosjob.submitReady(), [])) { end('submit_ready', "formulaire prêt : clique toi-même sur « J'envoie ma candidature ! »"); break; }
+      if (await call(tabId, 0, () => window.__sosjob.submitReady(), [])) { end('submit_ready', "formulaire prêt : clique toi-même sur le bouton d'envoi"); break; }
 
       // bouton de passage (dans le premier cadre qui en a un)
       const before = await call(tabId, 0, () => window.__sosjob.stepSig(), []);

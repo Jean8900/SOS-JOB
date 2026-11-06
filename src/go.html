@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOS-JOB Go</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff; --panel: #f5f6f8; --text: #1b1f27; --muted: #5d6573; --line: #d6dae1;
+  --accent: #1f6feb; --accent-text: #ffffff; --tag: #e4ecfb; --ok: #1a7f4b; --bad: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1e1e1e; --panel: #262729; --text: #e6e7ea; --muted: #a0a6b1; --line: #3b3d42;
+    --accent: #4c8dff; --accent-text: #0d1117; --tag: #2b3a55; --ok: #4cc38a; --bad: #ff8a80; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+main { max-width: 680px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
+section { border-top: 1px solid var(--line); padding: 14px 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+label { display: inline-flex; align-items: center; gap: 8px; }
+input[type=number] { width: 76px; }
+input[type=number], .tags { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; cursor: text; }
+.tags input { flex: 1 1 140px; min-width: 120px; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; padding: 2px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; background: var(--tag); border-radius: 12px; padding: 2px 4px 2px 10px; }
+.tag button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-top: 10px; }
+.site { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 6px 0; min-height: 40px; }
+.hint { color: var(--muted); font-size: 12px; }
+.hidden { display: none !important; }
+#primary { width: 100%; border: 0; border-radius: 8px; padding: 12px; background: var(--accent); color: var(--accent-text); font: 600 15px system-ui, "Segoe UI", sans-serif; cursor: pointer; }
+#primary:disabled { opacity: .55; cursor: default; }
+.secondary { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+#bar { height: 12px; border-radius: 6px; background: var(--panel); overflow: hidden; margin: 14px 0 8px; }
+#fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+#log { margin: 10px 0 0; max-height: 240px; overflow: auto; background: var(--panel); border-radius: 6px; padding: 8px 10px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#done { color: var(--ok); font-size: 17px; font-weight: 600; margin-top: 14px; }
+#error { color: var(--bad); margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SOS-JOB Go</h1>
+  <fieldset id="form">
+    <section>
+      <h2>Filtre</h2>
+      <label><input type="checkbox" id="filter"> Filtrer les offres</label>
+      <div class="tags" id="tags"><input id="tagInput" placeholder="Ajouter un métier, puis Entrée" aria-label="Métiers"></div>
+      <div class="row">
+        <span>Années d'expérience</span>
+        <label>min <input type="number" id="yearsMin" min="0" max="40"></label>
+        <label>max <input type="number" id="yearsMax" min="0" max="40"></label>
+      </div>
+      <p class="hint">Une offre qui n'indique pas d'années d'expérience est gardée. <span id="fixed"></span></p>
+    </section>
+    <section>
+      <h2>Sites et nombre d'offres</h2>
+      <div class="row">
+        <label id="globalN">Offres max par site <input type="number" id="n" min="0"></label>
+        <label><input type="checkbox" id="dedicated"> Choisir un nb dédié par site</label>
+      </div>
+      <div id="sites" style="margin-top:8px"></div>
+    </section>
+    <section>
+      <h2>Alertes reçues par mail</h2>
+      <div id="mailStatus" class="hint"></div>
+      <div id="mails"></div>
+    </section>
+  </fieldset>
+  <section>
+    <button id="primary" type="button"></button>
+    <div id="resume" class="row hidden">
+      <button class="secondary" type="button" id="drop">Laisser tomber ces offres</button>
+    </div>
+    <div id="error" role="alert"></div>
+    <div id="progress" class="hidden" aria-live="polite">
+      <div id="bar"><div id="fill"></div></div>
+      <div id="genMsg"></div>
+      <div id="fillMsg"></div>
+      <div id="fillPercent" class="hint"></div>
+      <p class="hint" id="handsOff">Ne touche ni au clavier ni à la souris pendant le remplissage : l'extension agit sur l'onglet actif de Chrome.</p>
+    </div>
+    <div id="done"></div>
+    <div id="video" class="hint"></div>
+    <pre id="log" class="hidden"></pre>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let shownPhase = 'idle';
+let catalog = null, server = { phase: 'idle', opened: [], mail: { status: 'loading', sites: {} }, log: [] }, professions = [], busy = false;
+
+async function post(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-SOSJOB-GO': '1' }, body: JSON.stringify(body || {}) });
+  return r.json();
+}
+
+function renderTags() {
+  document.querySelectorAll('#tags .tag').forEach((t) => t.remove());
+  professions.forEach((p, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = p;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '×';
+    x.setAttribute('aria-label', 'Retirer ' + p);
+    x.onclick = () => { professions.splice(i, 1); renderTags(); refresh(); };
+    tag.appendChild(x);
+    $('tags').insertBefore(tag, $('tagInput'));
+  });
+}
+
+function addTag() {
+  const value = $('tagInput').value.trim().replace(/,$/, '');
+  if (value && !professions.includes(value)) professions.push(value);
+  $('tagInput').value = '';
+  renderTags();
+}
+
+function readForm() {
+  const sites = {};
+  catalog.sites.forEach((s) => {
+    sites[s.slug] = { on: $('on-' + s.slug).checked, n: $('n-' + s.slug).value };
+  });
+  const mail = {};
+  catalog.mail_sites.forEach((m) => { mail[m.slug] = $('mail-' + m.slug).value; });
+  return { filter: $('filter').checked, professions, years_min: $('yearsMin').value, years_max: $('yearsMax').value,
+           n: $('n').value, dedicated: $('dedicated').checked, sites, mail };
+}
+
+function buildForm() {
+  const f = catalog.form;
+  $('filter').checked = f.filter;
+  $('fixed').textContent = `Lieux (${catalog.locations.join(', ') || 'tous'}) et contrats (${catalog.contract_types.join(', ') || 'tous'}) : input/criteria.yaml.`;
+  professions = [...f.professions];
+  renderTags();
+  $('yearsMin').value = f.years_min ?? '';
+  $('yearsMax').value = f.years_max ?? '';
+  $('n').value = f.n ?? '';
+  $('dedicated').checked = f.dedicated;
+  catalog.sites.forEach((s) => {
+    const row = document.createElement('div');
+    row.className = 'site';
+    const label = document.createElement('label');
+    const on = document.createElement('input');
+    on.type = 'checkbox'; on.id = 'on-' + s.slug; on.checked = !!f.sites[s.slug]?.on;
+    label.append(on, s.name);
+    const n = document.createElement('input');
+    n.type = 'number'; n.min = 0; n.id = 'n-' + s.slug; n.value = f.sites[s.slug]?.n ?? ''; n.setAttribute('aria-label', 'Offres pour ' + s.name);
+    n.className = 'dedicatedN';
+    row.append(label, n);
+    $('sites').append(row);
+  });
+  catalog.mail_sites.forEach((m) => {
+    const row = document.createElement('div');
+    row.className = 'site';
+    const label = document.createElement('label');
+    label.htmlFor = 'mail-' + m.slug;
+    label.append(m.name + ' ');
+    const count = document.createElement('span');
+    count.className = 'hint'; count.id = 'count-' + m.slug;
+    label.append(count);
+    const n = document.createElement('input');
+    n.type = 'number'; n.min = 0; n.id = 'mail-' + m.slug; n.value = f.mail[m.slug] ?? '';
+    row.append(label, n);
+    $('mails').append(row);
+  });
+  $('form').addEventListener('input', refresh);
+  $('form').addEventListener('change', refresh);
+}
+
+function chosenLoginSites() {
+  const f = readForm();
+  return catalog.sites.filter((s) => s.login_url && f.sites[s.slug].on && (f.dedicated ? Number(f.sites[s.slug].n) > 0 : Number(f.n) > 0));
+}
+
+function refresh() {
+  if (!catalog) return;
+  const phase = server.phase;
+  const dedicated = $('dedicated').checked;
+  $('globalN').classList.toggle('hidden', dedicated);
+  document.querySelectorAll('.dedicatedN').forEach((el) => el.classList.toggle('hidden', !dedicated));
+
+  const mail = server.mail;
+  $('mailStatus').textContent = mail.status === 'loading' ? 'Lecture des mails...' : mail.status === 'error' ? 'Gmail : ' + mail.error : '';
+  catalog.mail_sites.forEach((m) => {
+    const info = mail.sites[m.slug];
+    $('count-' + m.slug).textContent = info ? `${info.received} reçue(s), ${info.new} nouvelle(s)` : '';
+    $('mail-' + m.slug).disabled = !info;
+    if (info) $('mail-' + m.slug).max = info.new;
+  });
+
+  const running = phase === 'running' || phase === 'login';
+  if (phase !== shownPhase) {  // la progression est sous le formulaire : on l'amène à l'écran
+    shownPhase = phase;
+    if (phase !== 'idle') setTimeout(() => $('primary').scrollIntoView({ block: 'start' }), 50);
+  }
+  $('form').disabled = running;
+  const toOpen = chosenLoginSites().filter((s) => !server.opened.includes(s.slug));
+  const button = $('primary');
+  button.disabled = busy || phase === 'running';
+  if (phase === 'running') button.textContent = 'En cours...';
+  else if (phase === 'login') button.textContent = `Reprendre les ${server.waiting} offre(s) après connexion`;
+  else if (phase === 'done' || phase === 'error') button.textContent = 'Nouvelle sélection';
+  else if (toOpen.length) button.textContent = `Me connecter aux ${toOpen.length} site(s)`;
+  else button.textContent = 'Connecté : lancer les candidatures';
+
+  $('resume').classList.toggle('hidden', phase !== 'login');
+  $('progress').classList.toggle('hidden', !running && phase !== 'done');
+  $('handsOff').classList.toggle('hidden', phase === 'done');
+  $('fill').style.width = (server.percent || 0) + '%';
+  $('genMsg').textContent = server.gen_msg || '';
+  $('fillMsg').textContent = server.fill_msg || '';
+  $('fillPercent').textContent = running || phase === 'done' ? `${server.fill_percent || 0}% des offres candidatées` : '';
+  $('done').textContent = server.done || '';
+  $('video').textContent = server.video ? 'Vidéo : ' + server.video : '';
+  if (server.error) $('error').textContent = server.error;
+  const log = server.log || [];
+  $('log').classList.toggle('hidden', !log.length);
+  if ($('log').textContent !== log.join('\n')) {
+    $('log').textContent = log.join('\n');
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+}
+
+async function primary() {
+  if (busy || !catalog) return;
+  addTag();
+  $('error').textContent = '';
+  busy = true;
+  refresh();
+  try {
+    let result = { ok: true };
+    const phase = server.phase;
+    if (phase === 'login') result = await post('/resume', { retry: true });
+    else if (phase === 'done' || phase === 'error') result = await post('/reset');
+    else if (chosenLoginSites().some((s) => !server.opened.includes(s.slug))) result = await post('/connect', readForm());
+    else result = await post('/start', readForm());
+    if (result.error) $('error').textContent = result.error;
+  } catch (e) {
+    $('error').textContent = 'Programme go arrêté ? ' + e;
+  }
+  busy = false;
+  await poll();
+}
+
+async function poll() {
+  try {
+    server = await (await fetch('/state')).json();
+    refresh();
+  } catch (e) {
+    $('error').textContent = 'Programme go arrêté : relance .\\go.ps1';
+  }
+}
+
+$('primary').onclick = primary;
+$('drop').onclick = () => post('/resume', { retry: false }).then(poll);
+$('tags').onclick = () => $('tagInput').focus();
+$('tagInput').addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ',') && $('tagInput').value.trim()) {
+    e.preventDefault();
+    e.stopPropagation();
+    addTag();
+    refresh();
+  } else if (e.key === 'Backspace' && !$('tagInput').value && professions.length) {
+    professions.pop();
+    renderTags();
+    refresh();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+    e.preventDefault();
+    primary();
+  }
+});
+
+(async () => {
+  catalog = await (await fetch('/catalog')).json();
+  buildForm();
+  await poll();
+  setInterval(poll, 1000);
+})();
+</script>
+</body>
+</html>
